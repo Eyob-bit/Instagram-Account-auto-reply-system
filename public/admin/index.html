@@ -307,6 +307,22 @@
         </div>
       </div>
 
+      <!-- 🤖 AI Auto-Approve Switch Panel -->
+      <div class="panel" style="border: 2px solid var(--primary); background: #131d2e;">
+        <div class="panel-header">
+          <div>
+            <span class="panel-title" style="color:var(--primary);">🤖 AI Auto-Approve Mode (24/7 Background Agent)</span>
+            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.2rem;">
+              When active (ON), incoming DMs from new customers are <strong>automatically approved 24/7</strong> even when your browser or PC is turned off.
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-ai-approve" onchange="toggleAiApproveState(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
       <!-- 🆕 NEW CUSTOMERS (PENDING) PROMINENT SECTION -->
       <div class="pending-section">
         <div class="pending-header">
@@ -432,6 +448,17 @@
         </div>
         
         <form id="settings-form" onsubmit="saveSettings(event)">
+          <div class="form-group" style="background:#131d2e; padding:1rem; border-radius:8px; border:1px solid var(--primary); margin-bottom:1.5rem;">
+            <label style="color:var(--primary); font-size:0.95rem;">🤖 AI Auto-Approve Mode</label>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:0.5rem;">
+              <span style="font-size:0.85rem; color:var(--text-muted);">Automatically approve new customers 24/7 without waiting for browser dashboard.</span>
+              <label class="switch">
+                <input type="checkbox" id="setting-ai-approve">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
           <div class="form-group">
             <label>Reply #1 Message</label>
             <input type="text" id="setting-reply1" class="form-input" required oninput="updateLivePreview()" />
@@ -593,6 +620,7 @@
           document.getElementById('login-overlay').style.display = 'none';
           startPolling();
           loadDashboardData();
+          loadSettings();
         } else {
           showLoginOverlay();
         }
@@ -643,13 +671,15 @@
     // Dashboard Data & Pending Customers Loader
     async function loadDashboardData(isBackgroundPoll = false) {
       try {
-        const [statsRes, pendingRes] = await Promise.all([
+        const [statsRes, pendingRes, settingsRes] = await Promise.all([
           fetch(`${API_BASE}/dashboard/stats`, { headers: authHeaders() }),
-          fetch(`${API_BASE}/customers/pending`, { headers: authHeaders() })
+          fetch(`${API_BASE}/customers/pending`, { headers: authHeaders() }),
+          fetch(`${API_BASE}/settings`, { headers: authHeaders() })
         ]);
 
         const statsData = await statsRes.json();
         const pendingData = await pendingRes.json();
+        const settingsData = await settingsRes.json();
 
         if (statsData.success && statsData.data) {
           const stats = statsData.data;
@@ -700,6 +730,13 @@
               </tr>
             `).join('');
           }
+        }
+
+        // Render AI Auto-Approve Toggle State
+        if (settingsData.success && settingsData.data) {
+          const s = settingsData.data;
+          document.getElementById('toggle-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
+          document.getElementById('setting-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
         }
 
         // Render Pending Customers (🆕 NEW CUSTOMERS DISCOVERED SECTION)
@@ -776,6 +813,18 @@
         });
         loadDashboardData();
       } catch (err) { alert('Failed to toggle automation state'); }
+    }
+
+    async function toggleAiApproveState(enabled) {
+      try {
+        await fetch(`${API_BASE}/settings`, {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ aiAutoApproveEnabled: enabled })
+        });
+        showToast(enabled ? '🤖 AI Auto-Approve Mode is now ACTIVE (24/7 background auto-approval)' : '⏸️ AI Auto-Approve Mode is now PAUSED (Manual approval mode)');
+        loadDashboardData();
+      } catch (err) { alert('Failed to toggle AI Auto-Approve mode'); }
     }
 
     // Customer List Management
@@ -937,6 +986,8 @@
           document.getElementById('setting-delay').value = s.replyDelaySeconds;
           document.getElementById('setting-reply2').value = s.reply2;
           document.getElementById('setting-notif').value = s.notificationMessage;
+          document.getElementById('setting-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
+          document.getElementById('toggle-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
           updateLivePreview();
         }
       } catch (err) { console.error(err); }
@@ -960,16 +1011,18 @@
       const replyDelaySeconds = Number(document.getElementById('setting-delay').value);
       const reply2 = document.getElementById('setting-reply2').value;
       const notificationMessage = document.getElementById('setting-notif').value;
+      const aiAutoApproveEnabled = Boolean(document.getElementById('setting-ai-approve').checked);
 
       try {
         const res = await fetch(`${API_BASE}/settings`, {
           method: 'PUT',
           headers: authHeaders(),
-          body: JSON.stringify({ reply1, replyDelaySeconds, reply2, notificationMessage })
+          body: JSON.stringify({ reply1, replyDelaySeconds, reply2, notificationMessage, aiAutoApproveEnabled })
         });
         const data = await res.json();
         if (res.ok && data.success) {
           showToast('Settings saved successfully!');
+          loadDashboardData();
         } else { alert('Failed to save settings'); }
       } catch (err) { alert('Network error'); }
     }

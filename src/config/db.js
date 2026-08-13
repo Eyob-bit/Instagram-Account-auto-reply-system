@@ -77,8 +77,11 @@ async function initSchema() {
       notification_message TEXT DEFAULT '🚨 Hurry up! There is a customer.',
       automation_enabled BOOLEAN DEFAULT true,
       auto_reply_once_per_conversation BOOLEAN DEFAULT true,
+      ai_auto_approve_enabled BOOLEAN DEFAULT true,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS ai_auto_approve_enabled BOOLEAN DEFAULT true;
 
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id SERIAL PRIMARY KEY,

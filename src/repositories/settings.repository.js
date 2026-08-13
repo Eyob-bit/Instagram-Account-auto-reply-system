@@ -13,7 +13,8 @@ class SettingsRepository {
       replyDelaySeconds: 3,
       notificationMessage: "🚨 Hurry up! There is a customer.",
       automationEnabled: true,
-      autoReplyOncePerConversation: true
+      autoReplyOncePerConversation: true,
+      aiAutoApproveEnabled: true
     };
   }
 
@@ -29,7 +30,8 @@ class SettingsRepository {
             replyDelaySeconds: row.reply_delay_seconds,
             notificationMessage: row.notification_message,
             automationEnabled: row.automation_enabled,
-            autoReplyOncePerConversation: row.auto_reply_once_per_conversation
+            autoReplyOncePerConversation: row.auto_reply_once_per_conversation,
+            aiAutoApproveEnabled: row.ai_auto_approve_enabled !== false
           };
           return { ...this.settings };
         }
@@ -47,7 +49,10 @@ class SettingsRepository {
       ...newSettings,
       replyDelaySeconds: newSettings.replyDelaySeconds !== undefined
         ? Number(newSettings.replyDelaySeconds)
-        : this.settings.replyDelaySeconds
+        : this.settings.replyDelaySeconds,
+      aiAutoApproveEnabled: newSettings.aiAutoApproveEnabled !== undefined
+        ? Boolean(newSettings.aiAutoApproveEnabled)
+        : this.settings.aiAutoApproveEnabled
     };
 
     if (db.isPostgresAvailable && db.pool) {
@@ -55,8 +60,8 @@ class SettingsRepository {
         await db.query(
           `INSERT INTO settings (
             id, reply1, reply2, reply_delay_seconds, notification_message,
-            automation_enabled, auto_reply_once_per_conversation, updated_at
-          ) VALUES (1, $1, $2, $3, $4, $5, $6, NOW())
+            automation_enabled, auto_reply_once_per_conversation, ai_auto_approve_enabled, updated_at
+          ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, NOW())
           ON CONFLICT (id) DO UPDATE SET
             reply1 = EXCLUDED.reply1,
             reply2 = EXCLUDED.reply2,
@@ -64,6 +69,7 @@ class SettingsRepository {
             notification_message = EXCLUDED.notification_message,
             automation_enabled = EXCLUDED.automation_enabled,
             auto_reply_once_per_conversation = EXCLUDED.auto_reply_once_per_conversation,
+            ai_auto_approve_enabled = EXCLUDED.ai_auto_approve_enabled,
             updated_at = NOW()`,
           [
             this.settings.reply1,
@@ -71,7 +77,8 @@ class SettingsRepository {
             this.settings.replyDelaySeconds,
             this.settings.notificationMessage,
             this.settings.automationEnabled,
-            this.settings.autoReplyOncePerConversation
+            this.settings.autoReplyOncePerConversation,
+            this.settings.aiAutoApproveEnabled
           ]
         );
       } catch (err) {

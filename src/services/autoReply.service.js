@@ -66,8 +66,23 @@ class AutoReplyService {
     }
 
     // 2. Auto-discover & record customer in repository using senderId (CUSTOMER ID)
-    const customer = await approvedUsersRepo.recordIncomingMessage(senderId, text, messageId);
-    const isApproved = Boolean(customer && customer.status === 'APPROVED' && customer.active);
+    let customer = await approvedUsersRepo.recordIncomingMessage(senderId, text, messageId);
+    let isApproved = Boolean(customer && customer.status === 'APPROVED' && customer.active);
+
+    // 3. Load dynamic settings
+    const settings = await settingsRepo.getSettings();
+
+    // 🤖 AI AUTO-APPROVE CHECK:
+    // If customer is PENDING and AI Auto-Approve mode is enabled in settings,
+    // automatically approve the customer immediately without waiting for browser dashboard!
+    if (!isApproved && customer.status === 'PENDING' && settings.aiAutoApproveEnabled) {
+      logger.info(`🤖 [AI AUTO-APPROVE ACTIVE] New customer [${senderId}] detected! Auto-approving immediately 24/7...`);
+      const approveResult = await approvedUsersRepo.approveUser(senderId);
+      if (approveResult && approveResult.customer) {
+        customer = approveResult.customer;
+        isApproved = true;
+      }
+    }
 
     // Display formatted customer banner in terminal (Privacy compliant)
     this.logCustomerBanner(senderId, text, customer, isApproved);
@@ -91,8 +106,6 @@ class AutoReplyService {
       return;
     }
 
-    // 3. Load dynamic settings
-    const settings = await settingsRepo.getSettings();
     if (!settings.automationEnabled) {
       logger.info('Auto-reply automation is currently globally disabled in settings.');
       
