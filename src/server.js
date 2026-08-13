@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const config = require('./config/env');
+const db = require('./config/db');
 const logger = require('./utils/logger');
 const requestLogger = require('./middleware/requestLogger');
 const errorHandler = require('./middleware/errorHandler');
@@ -88,14 +89,19 @@ app.use((req, res) => {
 // Centralized Error Handling Middleware
 app.use(errorHandler);
 
-// Start HTTP Server
-const server = app.listen(config.port, () => {
+// Start HTTP Server & Initialize DB Schema
+const server = app.listen(config.port, async () => {
   logger.info(`🚀 Instagram Auto-Reply System server running on port ${config.port} (${config.nodeEnv})`);
   logger.info(`GET  /api/health            - Health Status Check`);
   logger.info(`GET  /admin                 - Admin Dashboard`);
   logger.info(`GET  /privacy               - Privacy Policy Page`);
   logger.info(`GET  /webhooks/instagram    - Meta Webhook Verification`);
   logger.info(`POST /webhooks/instagram    - Meta Webhook Event Receiver`);
+
+  // Initialize DB tables if PostgreSQL is configured
+  if (db.isPostgresAvailable) {
+    await db.initSchema();
+  }
 });
 
 // Handle graceful shutdown

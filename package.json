@@ -25,6 +25,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.3",
     "ngrok": "^5.0.0-beta.2",
+    "pg": "^8.23.0",
     "web-push": "^3.6.7"
   }
 }
