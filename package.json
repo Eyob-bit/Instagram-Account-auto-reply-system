@@ -1,0 +1,30 @@
+{
+  "name": "instagram-auto-reply-system",
+  "version": "1.0.0",
+  "description": "Instagram Professional Account DMs auto-reply system using Meta Webhooks and Instagram Graph API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "instagram",
+    "meta",
+    "webhooks",
+    "auto-reply",
+    "express",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "ngrok": "^5.0.0-beta.2",
+    "web-push": "^3.6.7"
+  }
+}

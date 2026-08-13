@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — Customer Auto Reply</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1e293b" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-light: #334155;
+      --border: #475569;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --radius: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Login Page Overlay */
+    #login-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+    .login-card h2 { color: var(--primary); margin-bottom: 0.5rem; font-size: 1.6rem; }
+    .login-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1.2rem; text-align: left; }
+    .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 600; }
+    .form-input {
+      width: 100%; padding: 0.75rem 1rem;
+      background: #0f172a; border: 1px solid var(--border);
+      border-radius: 8px; color: #fff; font-size: 1rem; outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: var(--primary); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0.75rem 1.4rem; font-size: 0.95rem; font-weight: 600;
+      border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s;
+      gap: 0.5rem; text-decoration: none;
+    }
+    .btn-primary { background: var(--primary); color: #0f172a; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--warning); color: #0f172a; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--surface-light); }
+    .btn-block { width: 100%; }
+    .alert-error {
+      background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger);
+      color: #fca5a5; padding: 0.65rem; border-radius: 8px; font-size: 0.88rem; margin-bottom: 1rem; display: none;
+    }
+    .toast-success {
+      position: fixed; top: 1.5rem; right: 1.5rem; z-index: 10000;
+      background: #059669; color: #ecfdf5; padding: 1rem 1.5rem; border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4); font-weight: 600; display: none;
+    }
+
+    /* Main Dashboard Layout */
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .brand h1 { font-size: 1.25rem; color: #fff; font-weight: 700; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.3rem 0.8rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600;
+    }
+    .status-active { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid var(--success); }
+    .status-paused { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid var(--danger); }
+    .pending-notif-badge {
+      background: var(--warning); color: #0f172a; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.78rem; font-weight: 700; display: none;
+    }
+    
+    /* Navigation Bar */
+    nav {
+      background: #172033; border-bottom: 1px solid var(--border); padding: 0 1.5rem;
+      display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+    .nav-tab {
+      padding: 0.85rem 1.2rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600;
+      border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; transition: all 0.2s;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* Main Content Container */
+    main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 2rem 1.5rem; flex: 1; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Summary Cards */
+    .grid-cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;
+    }
+    .card-stat {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem; text-align: left;
+    }
+    .card-stat .title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .card-stat .value { font-size: 1.8rem; font-weight: 700; color: #fff; margin-top: 0.3rem; }
+
+    /* New Customers List (Pending Section) */
+    .pending-section {
+      background: #1a2538; border: 2px solid var(--warning); border-radius: var(--radius);
+      padding: 1.5rem; margin-bottom: 2rem;
+    }
+    .pending-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;
+    }
+    .pending-title { font-size: 1.2rem; font-weight: 700; color: #fde68a; display: flex; align-items: center; gap: 0.5rem; }
+
+    .pending-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;
+    }
+    .pending-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.25rem; position: relative; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .pending-card .user-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+    .pending-card .username { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+    .pending-card .ig-id { font-size: 0.82rem; color: var(--text-muted); font-family: monospace; }
+    .pending-card .latest-msg {
+      background: #0f172a; border-left: 3px solid var(--warning); border-radius: 4px;
+      padding: 0.65rem 0.85rem; font-size: 0.9rem; color: #e2e8f0; margin-bottom: 0.85rem;
+    }
+    .pending-card .meta-info { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.2rem; }
+    .pending-card .actions { display: flex; gap: 0.5rem; }
+
+    /* Tables */
+    .table-container {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      overflow-x: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { background: #131d2e; padding: 0.85rem 1rem; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); color: #e2e8f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Panels */
+    .panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.75rem; margin-bottom: 1.5rem;
+    }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem; }
+    .panel-title { font-size: 1.15rem; font-weight: 700; color: #fff; }
+
+    /* Live Preview Box */
+    .preview-box {
+      background: #0f172a; border: 1px dashed var(--primary); border-radius: var(--radius);
+      padding: 1.25rem; margin-top: 1.5rem;
+    }
+    .chat-bubble {
+      max-width: 80%; padding: 0.65rem 1rem; border-radius: 16px; margin-bottom: 0.6rem; font-size: 0.9rem;
+    }
+    .chat-in { background: #334155; color: #fff; border-bottom-left-radius: 4px; }
+    .chat-out { background: #0284c7; color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+    .chat-delay { text-align: center; color: var(--text-muted); font-size: 0.75rem; margin: 0.4rem 0; font-style: italic; }
+    .chat-notif { background: rgba(245, 158, 11, 0.2); border: 1px solid var(--warning); color: #fde68a; text-align: center; font-size: 0.85rem; border-radius: 8px; padding: 0.5rem; margin-top: 0.6rem; }
+
+    /* Modals */
+    .modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      z-index: 999; display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-content {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      width: 100%; max-width: 520px; padding: 1.75rem; max-height: 90vh; overflow-y: auto;
+    }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .badge-success { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    .badge-danger { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+    .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+
+    /* Toggle Switch */
+    .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #475569; transition: .3s; border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px;
+      background-color: white; transition: .3s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--success); }
+    input:checked + .slider:before { transform: translateX(24px); }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Success Notification -->
+  <div id="toast" class="toast-success"></div>
+
+  <!-- Login Modal -->
+  <div id="login-overlay">
+    <div class="login-card">
+      <h2>🔐 Admin Login</h2>
+      <p>Customer Auto Reply System</p>
+      <div id="login-error" class="alert-error"></div>
+      <form id="login-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="login-username" class="form-input" required placeholder="admin" value="admin" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" class="form-input" required placeholder="••••••••" value="adminpassword123" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Log In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <h1>⚡ Customer Auto Reply Admin</h1>
+      <span id="global-status-badge" class="status-badge status-active">● AUTOMATION ACTIVE</span>
+      <span id="header-pending-badge" class="pending-notif-badge">🔔 NEW CUSTOMER (+0)</span>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+      <button onclick="logout()" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Logout</button>
+    </div>
+  </header>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+    <div class="nav-tab" onclick="switchTab('customers')">
+      👥 Customers List
+      <span id="nav-pending-badge" class="badge badge-warning" style="display:none;">0</span>
+    </div>
+    <div class="nav-tab" onclick="switchTab('messages')">💬 Messages History</div>
+    <div class="nav-tab" onclick="switchTab('settings')">⚙️ Auto Reply Settings</div>
+    <div class="nav-tab" onclick="switchTab('notifications')">📱 Phone Push Alerts</div>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    
+    <!-- Tab 1: Dashboard Home -->
+    <div id="tab-dashboard" class="tab-content active">
+      
+      <!-- Stat Cards -->
+      <div class="grid-cards">
+        <div class="card-stat">
+          <div class="title">New Customers (Pending)</div>
+          <div class="value" id="stat-pending-customers" style="color:var(--warning);">0</div>
+        </div>
+        <div class="card-stat">
+          <div class="title">Approved Customers</div>
+          <div class="value" id="stat-approved-customers">0</div>
+        </div>
+        <div class="card-stat">
+          <div class="title">Active Customers</div>
+          <div class="value" id="stat-active-customers">0</div>
+        </div>
+        <div class="card-stat">
+          <div class="title">Messages Today</div>
+          <div class="value" id="stat-messages-today">0</div>
+        </div>
+        <div class="card-stat">
+          <div class="title">Automations Triggered</div>
+          <div class="value" id="stat-automations">0</div>
+        </div>
+      </div>
+
+      <!-- 🆕 NEW CUSTOMERS (PENDING) PROMINENT SECTION -->
+      <div class="pending-section">
+        <div class="pending-header">
+          <span class="pending-title">🆕 NEW CUSTOMERS DISCOVERED (PENDING APPROVAL)</span>
+          <span style="font-size:0.85rem; color:var(--text-muted);">One-click approval to enable auto-replies</span>
+        </div>
+        
+        <div id="pending-customers-container" class="pending-grid">
+          <div style="color:var(--text-muted); font-style:italic;">No pending new customers right now. When someone sends a DM, they will appear here automatically!</div>
+        </div>
+      </div>
+
+      <!-- Global Automation Toggle -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Global Automation Switch</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-automation" onchange="toggleAutomationState(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">
+          When active (ON), incoming DMs from <strong>Approved Customers</strong> automatically trigger Reply #1, delay, Reply #2, and Phone Push Alert.
+        </p>
+      </div>
+
+      <!-- Recent Activity Table -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Recent Customer Activity</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Incoming Message</th>
+                <th>Status</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="recent-activity-body">
+              <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No activity recorded yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Approved / Customers List -->
+    <div id="tab-customers" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Customer List & Authorization</span>
+          <div style="display:flex; gap:0.5rem;">
+            <button onclick="loadCustomersFilter('')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">All</button>
+            <button onclick="loadCustomersFilter('PENDING')" class="btn btn-warning" style="padding:0.4rem 0.7rem; font-size:0.8rem;">🆕 Pending</button>
+            <button onclick="loadCustomersFilter('APPROVED')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">🟢 Approved</button>
+            <button onclick="loadCustomersFilter('DISABLED')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">🔴 Disabled</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Instagram User ID</th>
+                <th>Username</th>
+                <th>Latest Message</th>
+                <th>Messages</th>
+                <th>Status</th>
+                <th>Last Contacted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customers-table-body">
+              <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Loading customers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Messages History -->
+    <div id="tab-messages" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Conversation & Audit Logs</span>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button onclick="loadMessagesFilter('')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">All</button>
+            <button onclick="loadMessagesFilter('approved')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Approved Only</button>
+            <button onclick="loadMessagesFilter('completed')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Completed</button>
+            <button onclick="loadMessagesFilter('today')" class="btn btn-outline" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Today</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Incoming Message</th>
+                <th>Reply #1</th>
+                <th>Reply #2</th>
+                <th>Phone Push</th>
+                <th>Status</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="messages-table-body">
+              <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Loading messages...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Settings -->
+    <div id="tab-settings" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Auto Reply & Timing Settings</span>
+        </div>
+        
+        <form id="settings-form" onsubmit="saveSettings(event)">
+          <div class="form-group">
+            <label>Reply #1 Message</label>
+            <input type="text" id="setting-reply1" class="form-input" required oninput="updateLivePreview()" />
+          </div>
+
+          <div class="form-group">
+            <label>Delay Between Replies (Seconds, 0-60)</label>
+            <input type="number" id="setting-delay" class="form-input" min="0" max="60" required oninput="updateLivePreview()" />
+          </div>
+
+          <div class="form-group">
+            <label>Reply #2 Message</label>
+            <input type="text" id="setting-reply2" class="form-input" required oninput="updateLivePreview()" />
+          </div>
+
+          <div class="form-group">
+            <label>Phone Push Notification Message</label>
+            <input type="text" id="setting-notif" class="form-input" required oninput="updateLivePreview()" />
+            <span style="font-size:0.75rem; color: var(--text-muted);">Tip: Add <code>@username</code> to automatically insert the customer's handle.</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
+
+        <!-- Live Preview -->
+        <div class="preview-box">
+          <div style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:0.75rem;">LIVE AUTOMATION PREVIEW</div>
+          <div class="chat-bubble chat-in">💬 Customer: "Hello, I need some information."</div>
+          <div class="chat-bubble chat-out" id="preview-reply1">Hey 👋</div>
+          <div class="chat-delay" id="preview-delay">⌛ (Waiting 3 seconds...)</div>
+          <div class="chat-bubble chat-out" id="preview-reply2">I want to work with you</div>
+          <div class="chat-notif" id="preview-notif">📱 🚨 Hurry up! There is a customer! (@username contacted you)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 5: Notifications -->
+    <div id="tab-notifications" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Phone Push Notification Setup</span>
+          <span id="notif-status-badge" class="status-badge status-paused">🔴 Not Enabled</span>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+          Enable browser Web Push on your phone to receive native push notifications whenever an approved customer sends an Instagram DM.
+        </p>
+
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+          <button onclick="enablePhonePush()" class="btn btn-success">📱 Enable Phone Notifications</button>
+          <button onclick="sendTestNotification()" class="btn btn-outline">🔔 Send Test Notification</button>
+        </div>
+
+        <div class="grid-cards">
+          <div class="card-stat">
+            <div class="title">Subscribed Devices</div>
+            <div class="value" id="stat-device-count">0</div>
+          </div>
+          <div class="card-stat">
+            <div class="title">Last Notification Sent</div>
+            <div class="value" id="stat-last-notif" style="font-size:1.1rem;">Never</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Customer Detail & History Modal -->
+  <div id="customer-detail-modal" class="modal">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3 id="detail-modal-username" style="color:var(--primary);">Customer Details</h3>
+        <span id="detail-modal-status-badge" class="badge badge-warning">🟡 PENDING</span>
+      </div>
+
+      <div style="background:#0f172a; padding:1rem; border-radius:8px; margin-bottom:1rem; font-size:0.88rem;">
+        <div><strong>Instagram User ID:</strong> <code id="detail-modal-ig-id">--</code></div>
+        <div><strong>First Contacted:</strong> <span id="detail-modal-first-at">--</span></div>
+        <div><strong>Last Contacted:</strong> <span id="detail-modal-last-at">--</span></div>
+        <div><strong>Messages Received:</strong> <span id="detail-modal-count">0</span></div>
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <h4 style="font-size:0.95rem; color:var(--text-muted); margin-bottom:0.5rem;">Conversation Thread History</h4>
+        <div id="detail-modal-thread" style="background:#131d2e; border:1px solid var(--border); border-radius:8px; padding:1rem; max-height:220px; overflow-y:auto;">
+          <div style="color:var(--text-muted); text-align:center;">Loading conversation thread...</div>
+        </div>
+      </div>
+
+      <div id="detail-modal-actions" style="display:flex; gap:0.75rem; justify-content:flex-end;">
+        <button type="button" onclick="closeCustomerDetailModal()" class="btn btn-outline">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    let jwtToken = localStorage.getItem('admin_jwt_token') || '';
+    let pollInterval = null;
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', () => {
+      if (jwtToken) {
+        verifyAuthToken();
+      } else {
+        showLoginOverlay();
+      }
+      
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Registration error:', err));
+      }
+    });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3500);
+    }
+
+    // Auth Handlers
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+      const errorDiv = document.getElementById('login-error');
+      errorDiv.style.display = 'none';
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          jwtToken = data.token;
+          localStorage.setItem('admin_jwt_token', jwtToken);
+          document.getElementById('login-overlay').style.display = 'none';
+          startPolling();
+          loadDashboardData();
+        } else {
+          errorDiv.textContent = data.error || 'Login failed';
+          errorDiv.style.display = 'block';
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Server connection error';
+        errorDiv.style.display = 'block';
+      }
+    });
+
+    async function verifyAuthToken() {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${jwtToken}` }
+        });
+        if (res.ok) {
+          document.getElementById('login-overlay').style.display = 'none';
+          startPolling();
+          loadDashboardData();
+        } else {
+          showLoginOverlay();
+        }
+      } catch (err) {
+        showLoginOverlay();
+      }
+    }
+
+    function showLoginOverlay() {
+      localStorage.removeItem('admin_jwt_token');
+      jwtToken = '';
+      if (pollInterval) clearInterval(pollInterval);
+      document.getElementById('login-overlay').style.display = 'flex';
+    }
+
+    function logout() {
+      showLoginOverlay();
+    }
+
+    function authHeaders() {
+      return {
+        'Authorization': `Bearer ${jwtToken}`,
+        'Content-Type': 'application/json'
+      };
+    }
+
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(() => {
+        loadDashboardData(true);
+      }, 5000);
+    }
+
+    // Navigation Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(`tab-${tabId}`).classList.add('active');
+
+      if (tabId === 'customers') loadCustomers();
+      if (tabId === 'messages') loadMessages();
+      if (tabId === 'settings') loadSettings();
+      if (tabId === 'notifications') loadNotificationStatus();
+    }
+
+    // Dashboard Data & Pending Customers Loader
+    async function loadDashboardData(isBackgroundPoll = false) {
+      try {
+        const [statsRes, pendingRes] = await Promise.all([
+          fetch(`${API_BASE}/dashboard/stats`, { headers: authHeaders() }),
+          fetch(`${API_BASE}/customers/pending`, { headers: authHeaders() })
+        ]);
+
+        const statsData = await statsRes.json();
+        const pendingData = await pendingRes.json();
+
+        if (statsData.success && statsData.data) {
+          const stats = statsData.data;
+          document.getElementById('stat-pending-customers').textContent = stats.pendingCustomersCount || 0;
+          document.getElementById('stat-approved-customers').textContent = stats.approvedCustomersCount || 0;
+          document.getElementById('stat-active-customers').textContent = stats.activeCustomersCount || 0;
+          document.getElementById('stat-messages-today').textContent = stats.messagesTodayCount || 0;
+          document.getElementById('stat-automations').textContent = stats.automationsTriggeredCount || 0;
+          
+          const toggle = document.getElementById('toggle-automation');
+          toggle.checked = stats.automationEnabled;
+
+          const badge = document.getElementById('global-status-badge');
+          if (stats.automationEnabled) {
+            badge.className = 'status-badge status-active';
+            badge.textContent = '● AUTOMATION ACTIVE';
+          } else {
+            badge.className = 'status-badge status-paused';
+            badge.textContent = '● AUTOMATION PAUSED';
+          }
+
+          // Header Notification Badge for New Pending Customers
+          const pendingCount = stats.pendingCustomersCount || 0;
+          const headerBadge = document.getElementById('header-pending-badge');
+          const navBadge = document.getElementById('nav-pending-badge');
+
+          if (pendingCount > 0) {
+            headerBadge.style.display = 'inline-flex';
+            headerBadge.textContent = `🔔 NEW CUSTOMER (+${pendingCount})`;
+            navBadge.style.display = 'inline-block';
+            navBadge.textContent = pendingCount;
+          } else {
+            headerBadge.style.display = 'none';
+            navBadge.style.display = 'none';
+          }
+
+          // Recent Activity Table
+          const tbody = document.getElementById('recent-activity-body');
+          if (!stats.recentActivity || stats.recentActivity.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No activity recorded yet</td></tr>';
+          } else {
+            tbody.innerHTML = stats.recentActivity.map(r => `
+              <tr>
+                <td><strong>${r.username !== 'Username unavailable' ? '@' + r.username : r.instagram_user_id}</strong></td>
+                <td>"${r.incoming_message || '(No text)'}"</td>
+                <td><span class="badge ${r.status === 'COMPLETED' ? 'badge-success' : (r.status.includes('IGNORED') ? 'badge-warning' : 'badge-danger')}">${r.status}</span></td>
+                <td>${new Date(r.created_at).toLocaleTimeString()}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Render Pending Customers (🆕 NEW CUSTOMERS DISCOVERED SECTION)
+        if (pendingData.success && pendingData.data) {
+          renderPendingCustomers(pendingData.data);
+        }
+
+      } catch (err) { console.error('Dashboard load error:', err); }
+    }
+
+    function renderPendingCustomers(customers) {
+      const container = document.getElementById('pending-customers-container');
+      if (!customers || customers.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); font-style:italic;">No pending new customers right now. When someone sends a DM, they will appear here automatically!</div>';
+        return;
+      }
+
+      container.innerHTML = customers.map(c => `
+        <div class="pending-card" id="pending-card-${c.id}">
+          <div class="user-header">
+            <div>
+              <div class="username">${c.username !== 'Username unavailable' ? '@' + c.username : 'Username unavailable'}</div>
+              <div class="ig-id">Instagram ID: ${c.instagram_user_id}</div>
+            </div>
+            <span class="badge badge-warning">🟡 PENDING</span>
+          </div>
+
+          <div class="latest-msg">
+            💬 "${c.latest_message || '(No text message)'}"
+          </div>
+
+          <div class="meta-info">
+            <div>🕒 First Contacted: ${new Date(c.first_message_at).toLocaleString()}</div>
+            <div>🕒 Last Contacted: ${new Date(c.last_message_at).toLocaleString()}</div>
+            <div>📬 Total Messages: <strong>${c.message_count || 1}</strong></div>
+          </div>
+
+          <div class="actions">
+            <button onclick="approveCustomerOneClick('${c.id}')" class="btn btn-success" style="flex:1;">✅ ADD CUSTOMER</button>
+            <button onclick="openCustomerDetailModal('${c.id}')" class="btn btn-outline" style="padding:0.5rem 0.8rem;">🔍 History</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ONE-CLICK APPROVAL HANDLER
+    async function approveCustomerOneClick(id) {
+      try {
+        const res = await fetch(`${API_BASE}/approved-users/${id}/approve`, {
+          method: 'POST',
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`🎉 ${data.data.username !== 'Username unavailable' ? '@' + data.data.username : 'Customer ' + data.data.instagram_user_id} has been added to approved customers!`);
+          
+          // Instant UI remove from pending list
+          const card = document.getElementById(`pending-card-${id}`);
+          if (card) card.remove();
+
+          loadDashboardData();
+        } else {
+          alert(data.error || 'Failed to approve customer');
+        }
+      } catch (err) { alert('Network error'); }
+    }
+
+    async function toggleAutomationState(enabled) {
+      try {
+        await fetch(`${API_BASE}/settings`, {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ automationEnabled: enabled })
+        });
+        loadDashboardData();
+      } catch (err) { alert('Failed to toggle automation state'); }
+    }
+
+    // Customer List Management
+    async function loadCustomers(statusFilter = '') {
+      try {
+        const url = statusFilter ? `${API_BASE}/approved-users?status=${statusFilter}` : `${API_BASE}/approved-users`;
+        const res = await fetch(url, { headers: authHeaders() });
+        const data = await res.json();
+        const tbody = document.getElementById('customers-table-body');
+        
+        if (data.success && data.data) {
+          if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No customers found in this list.</td></tr>';
+          } else {
+            tbody.innerHTML = data.data.map(u => `
+              <tr>
+                <td><code>${u.instagram_user_id}</code></td>
+                <td><strong>${u.username !== 'Username unavailable' ? '@' + u.username : 'Username unavailable'}</strong></td>
+                <td>"${u.latest_message || '(No message)'}"</td>
+                <td>${u.message_count || 1}</td>
+                <td>
+                  <span class="badge ${u.status === 'APPROVED' ? 'badge-success' : (u.status === 'PENDING' ? 'badge-warning' : 'badge-danger')}">
+                    ${u.status === 'APPROVED' ? '🟢 APPROVED' : (u.status === 'PENDING' ? '🟡 PENDING' : '🔴 DISABLED')}
+                  </span>
+                </td>
+                <td>${new Date(u.last_message_at || u.created_at).toLocaleString()}</td>
+                <td>
+                  ${u.status === 'PENDING' ? `<button onclick="approveCustomerOneClick('${u.id}')" class="btn btn-success" style="padding:0.25rem 0.5rem; font-size:0.75rem;">+ Add Customer</button>` : ''}
+                  ${u.status === 'APPROVED' ? `<button onclick="toggleCustomerActive('${u.id}', false)" class="btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.75rem;">Disable</button>` : ''}
+                  ${u.status === 'DISABLED' ? `<button onclick="toggleCustomerActive('${u.id}', true)" class="btn btn-success" style="padding:0.25rem 0.5rem; font-size:0.75rem;">Enable</button>` : ''}
+                  <button onclick="openCustomerDetailModal('${u.id}')" class="btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.75rem;">History</button>
+                  <button onclick="deleteCustomer('${u.id}')" class="btn btn-danger" style="padding:0.25rem 0.5rem; font-size:0.75rem;">Delete</button>
+                </td>
+              </tr>
+            `).join('');
+          }
+        }
+      } catch (err) { console.error(err); }
+    }
+
+    function loadCustomersFilter(status) {
+      loadCustomers(status);
+    }
+
+    async function toggleCustomerActive(id, newActive) {
+      await fetch(`${API_BASE}/approved-users/${id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ active: newActive, status: newActive ? 'APPROVED' : 'DISABLED' })
+      });
+      loadCustomers();
+      loadDashboardData();
+    }
+
+    async function deleteCustomer(id) {
+      if (confirm('Are you sure you want to delete this customer? They will be removed from customer list but conversation audit history remains.')) {
+        await fetch(`${API_BASE}/approved-users/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders()
+        });
+        loadCustomers();
+        loadDashboardData();
+      }
+    }
+
+    // Customer Detail & Conversation History Modal
+    async function openCustomerDetailModal(id) {
+      try {
+        const res = await fetch(`${API_BASE}/approved-users/${id}/details`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success && data.data) {
+          const { customer, history } = data.data;
+          
+          document.getElementById('detail-modal-username').textContent = customer.username !== 'Username unavailable' ? `@${customer.username}` : `Customer ${customer.instagram_user_id}`;
+          
+          const badge = document.getElementById('detail-modal-status-badge');
+          badge.className = `badge ${customer.status === 'APPROVED' ? 'badge-success' : (customer.status === 'PENDING' ? 'badge-warning' : 'badge-danger')}`;
+          badge.textContent = customer.status;
+
+          document.getElementById('detail-modal-ig-id').textContent = customer.instagram_user_id;
+          document.getElementById('detail-modal-first-at').textContent = new Date(customer.first_message_at).toLocaleString();
+          document.getElementById('detail-modal-last-at').textContent = new Date(customer.last_message_at).toLocaleString();
+          document.getElementById('detail-modal-count').textContent = customer.message_count || 1;
+
+          // Thread History
+          const threadDiv = document.getElementById('detail-modal-thread');
+          if (!history || history.length === 0) {
+            threadDiv.innerHTML = '<div style="color:var(--text-muted); text-align:center;">No history recorded yet.</div>';
+          } else {
+            threadDiv.innerHTML = history.map(h => `
+              <div style="margin-bottom:0.75rem; border-bottom:1px dashed #334155; padding-bottom:0.5rem;">
+                <div style="color:var(--primary); font-size:0.85rem;">💬 Customer: "${h.incoming_message || ''}"</div>
+                ${h.reply_1_sent ? `<div style="color:#6ee7b7; font-size:0.82rem; margin-left:1rem;">🤖 Bot Reply #1: "${h.reply_1}"</div>` : ''}
+                ${h.reply_2_sent ? `<div style="color:#6ee7b7; font-size:0.82rem; margin-left:1rem;">🤖 Bot Reply #2: "${h.reply_2}"</div>` : ''}
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem;">${new Date(h.created_at).toLocaleString()} &bull; Status: ${h.status}</div>
+              </div>
+            `).join('');
+          }
+
+          // Modal Action buttons
+          const actionsDiv = document.getElementById('detail-modal-actions');
+          actionsDiv.innerHTML = `
+            ${customer.status === 'PENDING' ? `<button onclick="approveCustomerOneClick('${customer.id}'); closeCustomerDetailModal();" class="btn btn-success">✅ ADD CUSTOMER</button>` : ''}
+            <button onclick="closeCustomerDetailModal()" class="btn btn-outline">Close</button>
+          `;
+
+          document.getElementById('customer-detail-modal').style.display = 'flex';
+        }
+      } catch (err) { alert('Error loading customer details'); }
+    }
+
+    function closeCustomerDetailModal() {
+      document.getElementById('customer-detail-modal').style.display = 'none';
+    }
+
+    // Messages History Tab
+    async function loadMessages(filterQuery = '') {
+      try {
+        const url = filterQuery ? `${API_BASE}/conversations?${filterQuery}` : `${API_BASE}/conversations`;
+        const res = await fetch(url, { headers: authHeaders() });
+        const data = await res.json();
+        const tbody = document.getElementById('messages-table-body');
+
+        if (data.success && data.data) {
+          if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No message history records found</td></tr>';
+          } else {
+            tbody.innerHTML = data.data.map(m => `
+              <tr>
+                <td><strong>${m.username !== 'Username unavailable' ? '@' + m.username : m.instagram_user_id}</strong><br><span style="font-size:0.75rem; color:var(--text-muted);">${m.instagram_user_id}</span></td>
+                <td>"${m.incoming_message || ''}"</td>
+                <td>${m.reply_1_sent ? '✅ ' + m.reply_1 : '❌ (Not Sent)'}</td>
+                <td>${m.reply_2_sent ? '✅ ' + m.reply_2 : '❌ (Not Sent)'}</td>
+                <td>${m.notification_sent ? '🔔 Sent' : '⚪ Skipped'}</td>
+                <td><span class="badge ${m.status === 'COMPLETED' ? 'badge-success' : (m.status.includes('IGNORED') ? 'badge-warning' : 'badge-danger')}">${m.status}</span></td>
+                <td>${new Date(m.created_at).toLocaleString()}</td>
+              </tr>
+            `).join('');
+          }
+        }
+      } catch (err) { console.error(err); }
+    }
+
+    function loadMessagesFilter(type) {
+      if (type === 'approved') loadMessages('isApproved=true');
+      else if (type === 'completed') loadMessages('status=COMPLETED');
+      else if (type === 'today') loadMessages('timeRange=today');
+      else loadMessages();
+    }
+
+    // Settings
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${API_BASE}/settings`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success && data.data) {
+          const s = data.data;
+          document.getElementById('setting-reply1').value = s.reply1;
+          document.getElementById('setting-delay').value = s.replyDelaySeconds;
+          document.getElementById('setting-reply2').value = s.reply2;
+          document.getElementById('setting-notif').value = s.notificationMessage;
+          updateLivePreview();
+        }
+      } catch (err) { console.error(err); }
+    }
+
+    function updateLivePreview() {
+      const r1 = document.getElementById('setting-reply1').value || 'Hey 👋';
+      const delay = document.getElementById('setting-delay').value || 3;
+      const r2 = document.getElementById('setting-reply2').value || 'I want to work with you';
+      const notif = document.getElementById('setting-notif').value || '🚨 Hurry up! There is a customer!';
+
+      document.getElementById('preview-reply1').textContent = r1;
+      document.getElementById('preview-delay').textContent = `⌛ (Waiting ${delay} seconds...)`;
+      document.getElementById('preview-reply2').textContent = r2;
+      document.getElementById('preview-notif').textContent = `📱 ${notif} (@username contacted you)`;
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      const reply1 = document.getElementById('setting-reply1').value;
+      const replyDelaySeconds = Number(document.getElementById('setting-delay').value);
+      const reply2 = document.getElementById('setting-reply2').value;
+      const notificationMessage = document.getElementById('setting-notif').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/settings`, {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ reply1, replyDelaySeconds, reply2, notificationMessage })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast('Settings saved successfully!');
+        } else { alert('Failed to save settings'); }
+      } catch (err) { alert('Network error'); }
+    }
+
+    // Notifications Tab
+    async function loadNotificationStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/notifications/status`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success && data.data) {
+          const info = data.data;
+          document.getElementById('stat-device-count').textContent = info.devicesCount;
+          document.getElementById('stat-last-notif').textContent = info.lastNotificationSentAt 
+            ? new Date(info.lastNotificationSentAt).toLocaleString() 
+            : 'Never';
+
+          const badge = document.getElementById('notif-status-badge');
+          if (info.devicesCount > 0) {
+            badge.className = 'status-badge status-active';
+            badge.textContent = '🟢 Push Enabled';
+          } else {
+            badge.className = 'status-badge status-paused';
+            badge.textContent = '🔴 No Devices Registered';
+          }
+        }
+      } catch (err) { console.error(err); }
+    }
+
+    async function enablePhonePush() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert('Web Push is not supported by this browser');
+        return;
+      }
+
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+          alert('Notification permission denied');
+          return;
+        }
+
+        const keyRes = await fetch(`${API_BASE}/notifications/vapid-key`);
+        const keyData = await keyRes.json();
+        if (!keyData.publicKey) {
+          alert('VAPID public key not configured on backend');
+          return;
+        }
+
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+        });
+
+        const saveRes = await fetch(`${API_BASE}/notifications/subscribe`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ subscription: sub })
+        });
+        const saveResult = await saveRes.json();
+
+        if (saveRes.ok && saveResult.success) {
+          showToast('🎉 Phone Push Notifications enabled!');
+          loadNotificationStatus();
+        } else { alert('Failed to register subscription on backend'); }
+      } catch (err) { alert('Error enabling push: ' + err.message); }
+    }
+
+    async function sendTestNotification() {
+      try {
+        const res = await fetch(`${API_BASE}/notifications/test`, {
+          method: 'POST',
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast('🔔 Test notification sent!');
+          loadNotificationStatus();
+        } else { alert('Failed to send test notification'); }
+      } catch (err) { alert('Network error'); }
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+  </script>
+</body>
+</html>

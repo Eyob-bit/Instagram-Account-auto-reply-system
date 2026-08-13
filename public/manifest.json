@@ -1,0 +1,21 @@
+{
+  "name": "Customer Auto Reply Admin",
+  "short_name": "AutoReply",
+  "description": "Instagram Professional Account Auto-Reply System Admin",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2111/2111463.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2111/2111463.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
