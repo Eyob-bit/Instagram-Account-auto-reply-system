@@ -8,7 +8,8 @@ const logger = require('../utils/logger');
 
 // ───────── Gemini AI Configuration ─────────
 const GEMINI_API_KEY = config.geminiApiKey || process.env.GEMINI_API_KEY || '';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+// Using gemini-3.6-flash which is verified active & supported for generateContent
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 /**
  * Generate a conversational AI response using Gemini AI, maintaining full thread context.
@@ -19,6 +20,19 @@ const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/
  */
 async function generateConversationalAiReply(senderId, incomingText, username) {
   try {
+    const rawText = (incomingText || '').trim();
+    const cleanText = rawText.toLowerCase().replace(/[^\w\s]/gi, '').trim();
+    const simpleGreetings = ['hi', 'hey', 'hello', 'hey there', 'hi there', 'hola', 'yo'];
+
+    // If message is a simple greeting like "Hey" or "Hi", respond with a clean, short human greeting!
+    // No username tag, no long essay.
+    if (simpleGreetings.includes(cleanText)) {
+      const quickReplies = ['Hey! 👋', 'Hi! 👋', 'Hello! 👋', 'Hey there! 👋'];
+      const chosen = quickReplies[Math.floor(Math.random() * quickReplies.length)];
+      logger.info(`Simple greeting detected ("${rawText}"). Replying directly with: "${chosen}"`);
+      return chosen;
+    }
+
     // 1. Fetch recent conversation history to provide thread context to Gemini
     const allRecords = await conversationsRepo.getRecords();
     const historyRecords = allRecords
@@ -29,15 +43,14 @@ async function generateConversationalAiReply(senderId, incomingText, username) {
     // 2. Build multi-turn conversational contents array for Gemini
     const contents = [];
 
-    // System Persona Prompt
-    const systemPrompt = `You are a real, friendly, natural human assistant chatting directly with customers on Instagram DMs.
-Your goal is to talk like a normal person — warm, helpful, empathetic, casual yet professional.
+    // Human Persona Prompt Rules
+    const systemPrompt = `You are a real person chatting casually with a customer on Instagram DMs.
 RULES:
-1. Talk like a real human being having a conversation on Instagram DMs.
-2. Keep replies natural, concise (1-3 short sentences max), and conversational.
-3. Do NOT sound like a rigid bot or customer service script.
-4. Answer questions directly, offer help, and keep the dialogue flowing naturally.
-5. Customer's handle is ${username || 'the user'}.`;
+1. Talk naturally like a normal human friend having a chat on Instagram.
+2. Keep replies VERY SHORT and concise (1 short sentence max).
+3. Do NOT include usernames or greetings like "@username" or "Dear Customer".
+4. Do NOT give long detailed essays or corporate scripts.
+5. Answer questions directly, keep it friendly and casual.`;
 
     // Format historical conversation turns
     historyRecords.forEach(rec => {
@@ -58,10 +71,10 @@ RULES:
     // Add current incoming message turn
     contents.push({
       role: 'user',
-      parts: [{ text: incomingText || 'Hello' }]
+      parts: [{ text: rawText || 'Hello' }]
     });
 
-    // Call Gemini 2.0 Flash API
+    // Call Gemini 3.6 Flash API
     const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,8 +84,8 @@ RULES:
         },
         contents: contents,
         generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 180
+          temperature: 0.7,
+          maxOutputTokens: 120
         }
       })
     });
@@ -80,22 +93,22 @@ RULES:
     if (!response.ok) {
       const errText = await response.text();
       logger.error(`Gemini API error (HTTP ${response.status}): ${errText}`);
-      return `Hey ${username ? username : ''}! 👋 Thanks for reaching out! How can I help you?`;
+      return `Hey! 👋 How can I help?`;
     }
 
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
     if (!text) {
-      logger.warn('Gemini returned empty text response, using conversational fallback.');
-      return `Hey! Thanks for messaging. What can I do for you today?`;
+      logger.warn('Gemini returned empty text response, using simple fallback.');
+      return `Hey! How can I help?`;
     }
 
     return text;
 
   } catch (err) {
     logger.error(`Gemini AI generateConversationalAiReply error: ${err.message}`);
-    return `Hey! Thanks for your message! How can I help you today?`;
+    return `Hey! How can I help?`;
   }
 }
 
@@ -113,7 +126,7 @@ class AutoReplyService {
     if (isApproved) {
       logger.info(
         `\n============================================================\n` +
-        `✅ APPROVED INSTAGRAM CUSTOMER (AI CONVERSATION)\n` +
+        `✅ APPROVED INSTAGRAM CUSTOMER (AI CHAT)\n` +
         `============================================================\n` +
         `👤 Username: ${usernameDisplay}\n` +
         `🆔 Instagram User ID: ${senderId}\n` +
@@ -260,7 +273,7 @@ class AutoReplyService {
       }
 
       // Step 2: Generate natural human-like Gemini AI response with full conversation context
-      logger.info(`[Gemini AI] Generating contextual response for customer [${senderId}]...`);
+      logger.info(`[Gemini AI] Generating response for customer [${senderId}]...`);
       aiResponse = await generateConversationalAiReply(senderId, incomingText, username);
 
       // Step 3: Send AI reply to Instagram DM
