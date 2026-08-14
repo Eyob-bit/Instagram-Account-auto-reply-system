@@ -472,11 +472,11 @@
 
           <!-- AI Auto-Approve toggle -->
           <div class="form-group" style="background:#131d2e; padding:1rem; border-radius:8px; border:1px solid var(--primary); margin-bottom:1.5rem;">
-            <label style="color:var(--primary); font-size:0.95rem;">🤖 AI Auto-Approve Mode</label>
+            <label style="color:var(--primary); font-size:0.95rem;">🤖 AI Auto-Approve Mode (Auto-Add New Customers)</label>
             <div style="display:flex; align-items:center; justify-content:space-between; margin-top:0.5rem;">
-              <span style="font-size:0.85rem; color:var(--text-muted);">Automatically approve new customers 24/7 without waiting for the dashboard.</span>
+              <span style="font-size:0.85rem; color:var(--text-muted);">Automatically approve and add new customers 24/7 without waiting for manual dashboard approval.</span>
               <label class="switch">
-                <input type="checkbox" id="setting-ai-approve">
+                <input type="checkbox" id="setting-ai-approve" onchange="toggleAiApproveState(this.checked)">
                 <span class="slider"></span>
               </label>
             </div>
@@ -852,6 +852,11 @@
 
     async function toggleAiApproveState(enabled) {
       try {
+        const toggle1 = document.getElementById('toggle-ai-approve');
+        const toggle2 = document.getElementById('setting-ai-approve');
+        if (toggle1) toggle1.checked = enabled;
+        if (toggle2) toggle2.checked = enabled;
+
         await fetch(`${API_BASE}/settings`, {
           method: 'PUT',
           headers: authHeaders(),

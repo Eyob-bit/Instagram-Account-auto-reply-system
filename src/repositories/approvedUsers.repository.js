@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const settingsRepo = require('./settings.repository');
 const logger = require('../utils/logger');
 
 /**
@@ -21,6 +22,12 @@ class ApprovedUsersRepository {
   async recordIncomingMessage(instagramUserId, incomingMessage = '', messageId = null, username = '') {
     const igId = String(instagramUserId).trim();
     const now = new Date().toISOString();
+    const settings = await settingsRepo.getSettings();
+
+    const isAutoApproveOn = Boolean(settings.aiAutoApproveEnabled);
+    const defaultStatus = isAutoApproveOn ? 'APPROVED' : 'PENDING';
+    const defaultActive = isAutoApproveOn;
+    const defaultAutomationStatus = isAutoApproveOn ? 'COMPLETED' : 'PENDING_APPROVAL';
 
     if (db.isPostgresAvailable && db.pool) {
       try {
@@ -29,7 +36,17 @@ class ApprovedUsersRepository {
           const existing = selectRes.rows[0];
           const updatedMsgCount = (existing.message_count || 1) + 1;
           const updatedUsername = (username && username !== 'Not available' && existing.username === 'Username unavailable') ? username : existing.username;
-          const updatedAutomationStatus = existing.status === 'PENDING' ? 'PENDING_APPROVAL' : existing.automation_status;
+          
+          let newStatus = existing.status;
+          let newActive = existing.active;
+          let updatedAutomationStatus = existing.automation_status;
+
+          // If AI Auto-Approve is ON and customer was PENDING, auto-upgrade to APPROVED!
+          if (isAutoApproveOn && existing.status === 'PENDING') {
+            newStatus = 'APPROVED';
+            newActive = true;
+            updatedAutomationStatus = 'COMPLETED';
+          }
 
           const updateRes = await db.query(
             `UPDATE customers SET
@@ -38,10 +55,12 @@ class ApprovedUsersRepository {
               latest_message = COALESCE(NULLIF($3, ''), latest_message),
               pending_message_id = COALESCE($4, pending_message_id),
               username = $5,
-              automation_status = $6,
+              status = $6,
+              active = $7,
+              automation_status = $8,
               updated_at = $1
-             WHERE instagram_user_id = $7 RETURNING *`,
-            [now, updatedMsgCount, incomingMessage, messageId, updatedUsername, updatedAutomationStatus, igId]
+             WHERE instagram_user_id = $9 RETURNING *`,
+            [now, updatedMsgCount, incomingMessage, messageId, updatedUsername, newStatus, newActive, updatedAutomationStatus, igId]
           );
           const updatedCustomer = updateRes.rows[0];
           this.approvedUsers.set(igId, updatedCustomer);
@@ -53,9 +72,19 @@ class ApprovedUsersRepository {
             instagram_user_id, username, display_name, status, active,
             first_message_at, last_message_at, message_count, latest_message,
             pending_message_id, automation_status, created_at, updated_at
-          ) VALUES ($1, $2, $3, 'PENDING', false, $4, $4, 1, $5, $6, 'PENDING_APPROVAL', $4, $4)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $6, 1, $7, $8, $9, $6, $6)
           RETURNING *`,
-          [igId, username || 'Username unavailable', username ? `@${username}` : `Customer ${igId}`, now, incomingMessage || '', messageId || null]
+          [
+            igId,
+            username || 'Username unavailable',
+            username ? `@${username}` : `Customer ${igId}`,
+            defaultStatus,
+            defaultActive,
+            now,
+            incomingMessage || '',
+            messageId || null,
+            defaultAutomationStatus
+          ]
         );
         const newCustomer = insertRes.rows[0];
         this.approvedUsers.set(igId, newCustomer);
@@ -75,8 +104,11 @@ class ApprovedUsersRepository {
       if (username && username !== 'Not available' && customer.username === 'Username unavailable') {
         customer.username = username;
       }
-      if (customer.status === 'PENDING') {
-        customer.automation_status = 'PENDING_APPROVAL';
+
+      if (isAutoApproveOn && customer.status === 'PENDING') {
+        customer.status = 'APPROVED';
+        customer.active = true;
+        customer.automation_status = 'COMPLETED';
       }
       customer.updated_at = now;
       return customer;
@@ -87,14 +119,14 @@ class ApprovedUsersRepository {
       instagram_user_id: igId,
       username: username || 'Username unavailable',
       display_name: username ? `@${username}` : `Customer ${igId}`,
-      status: 'PENDING',
-      active: false,
+      status: defaultStatus,
+      active: defaultActive,
       first_message_at: now,
       last_message_at: now,
       message_count: 1,
       latest_message: incomingMessage || '',
       pending_message_id: messageId || null,
-      automation_status: 'PENDING_APPROVAL',
+      automation_status: defaultAutomationStatus,
       created_at: now,
       updated_at: now
     };
@@ -175,15 +207,15 @@ class ApprovedUsersRepository {
     const customer = await this.findById(idOrIgId);
     if (!customer) return null;
 
-    const wasPending = (customer.status === 'PENDING' && customer.automation_status === 'PENDING_APPROVAL');
+    const wasPending = (customer.status === 'PENDING');
     const now = new Date().toISOString();
 
     if (db.isPostgresAvailable && db.pool) {
       try {
         const updateRes = await db.query(
-          `UPDATE customers SET status = 'APPROVED', active = true, automation_status = $1, updated_at = $2
-           WHERE instagram_user_id = $3 RETURNING *`,
-          [wasPending ? 'PROCESSING' : customer.automation_status, now, customer.instagram_user_id]
+          `UPDATE customers SET status = 'APPROVED', active = true, automation_status = 'COMPLETED', updated_at = $1
+           WHERE instagram_user_id = $2 RETURNING *`,
+          [now, customer.instagram_user_id]
         );
         const updatedCustomer = updateRes.rows[0];
         this.approvedUsers.set(customer.instagram_user_id, updatedCustomer);
@@ -198,9 +230,7 @@ class ApprovedUsersRepository {
 
     customer.status = 'APPROVED';
     customer.active = true;
-    if (wasPending) {
-      customer.automation_status = 'PROCESSING';
-    }
+    customer.automation_status = 'COMPLETED';
     customer.updated_at = now;
 
     return {

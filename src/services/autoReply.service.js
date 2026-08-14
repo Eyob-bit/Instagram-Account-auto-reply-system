@@ -187,11 +187,11 @@ class AutoReplyService {
     // 3. Load dynamic settings
     const settings = await settingsRepo.getSettings();
 
-    // 🤖 AI AUTO-APPROVE CHECK:
-    // If customer is PENDING and AI Auto-Approve mode is enabled in settings,
-    // automatically approve customer immediately 24/7 without waiting for browser dashboard!
-    if (!isApproved && customer.status === 'PENDING' && settings.aiAutoApproveEnabled) {
-      logger.info(`🤖 [AI AUTO-APPROVE ACTIVE] New customer [${senderId}] detected! Auto-approving immediately 24/7...`);
+    // 🤖 AI AUTO-APPROVE (AUTO-ADD CUSTOMERS) CHECK:
+    // If customer is not approved yet and AI Auto-Approve mode is enabled in settings,
+    // automatically add & approve customer immediately 24/7!
+    if (!isApproved && customer.status !== 'DISABLED' && settings.aiAutoApproveEnabled) {
+      logger.info(`🤖 [AI AUTO-APPROVE ACTIVE] New customer [${senderId}] detected! Auto-approving customer immediately 24/7...`);
       const approveResult = await approvedUsersRepo.approveUser(senderId);
       if (approveResult && approveResult.customer) {
         customer = approveResult.customer;
