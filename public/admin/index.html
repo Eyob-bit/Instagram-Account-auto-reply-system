@@ -482,6 +482,17 @@
             </div>
           </div>
 
+          <!-- AI Persona & Training Instructions -->
+          <div class="form-group" style="background:#131d2e; padding:1.25rem; border-radius:10px; border:1px solid var(--primary); margin-bottom:1.5rem;">
+            <label style="color:var(--primary); font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+              🧠 Train Your AI Persona (Tone & Business Knowledge)
+            </label>
+            <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.75rem; line-height:1.4;">
+              Tell the AI who you are, how you want it to respond, your tone of voice, services, pricing, or guidelines. The AI will speak like you and remain <strong>extremely polite, warm, and respectful</strong>.
+            </div>
+            <textarea id="setting-ai-persona" class="form-input" rows="5" placeholder="e.g. I am a photographer offering portrait & event shoots starting at $150. Always be super polite, respectful, and friendly. If customers ask about booking, invite them to share their event date." style="resize:vertical; font-size:0.9rem; font-family:inherit; line-height:1.5;"></textarea>
+          </div>
+
           <!-- Typing Delay -->
           <div class="form-group">
             <label style="font-size:0.95rem;">⏱️ Human Typing Delay (Seconds)</label>
@@ -1010,6 +1021,7 @@
           document.getElementById('setting-notif').value = s.notificationMessage;
           document.getElementById('setting-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
           document.getElementById('toggle-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
+          document.getElementById('setting-ai-persona').value = s.aiPersonaInstruction || 'You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person.';
           updateLivePreview();
         }
       } catch (err) { console.error(err); }
@@ -1027,16 +1039,17 @@
       const replyDelaySeconds = Number(document.getElementById('setting-delay').value);
       const notificationMessage = document.getElementById('setting-notif').value;
       const aiAutoApproveEnabled = Boolean(document.getElementById('setting-ai-approve').checked);
+      const aiPersonaInstruction = document.getElementById('setting-ai-persona').value;
 
       try {
         const res = await fetch(`${API_BASE}/settings`, {
           method: 'PUT',
           headers: authHeaders(),
-          body: JSON.stringify({ replyDelaySeconds, notificationMessage, aiAutoApproveEnabled })
+          body: JSON.stringify({ replyDelaySeconds, notificationMessage, aiAutoApproveEnabled, aiPersonaInstruction })
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          showToast('⚙️ Settings saved successfully!');
+          showToast('⚙️ AI Training & Settings saved successfully!');
           loadDashboardData();
         } else { alert('Failed to save settings'); }
       } catch (err) { alert('Network error'); }

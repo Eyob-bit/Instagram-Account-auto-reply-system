@@ -24,7 +24,7 @@ async function generateConversationalAiReply(senderId, incomingText, username) {
     const cleanText = rawText.toLowerCase().replace(/[^\w\s]/gi, '').trim();
     const simpleGreetings = ['hi', 'hey', 'hello', 'hey there', 'hi there', 'hola', 'yo'];
 
-    // If message is a simple greeting like "Hey" or "Hi", respond with a clean, short human greeting!
+    // If message is a simple greeting like "Hey" or "Hi", respond with a clean, short polite human greeting!
     // No username tag, no long essay.
     if (simpleGreetings.includes(cleanText)) {
       const quickReplies = ['Hey! 👋', 'Hi! 👋', 'Hello! 👋', 'Hey there! 👋'];
@@ -33,24 +33,32 @@ async function generateConversationalAiReply(senderId, incomingText, username) {
       return chosen;
     }
 
-    // 1. Fetch recent conversation history to provide thread context to Gemini
+    // 1. Fetch dynamic settings to get user's custom AI Persona & Training instructions
+    const settings = await settingsRepo.getSettings();
+    const personaInstructions = settings.aiPersonaInstruction || 
+      'You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person.';
+
+    // 2. Fetch recent conversation history to provide thread context to Gemini
     const allRecords = await conversationsRepo.getRecords();
     const historyRecords = allRecords
       .filter(r => String(r.instagram_user_id) === String(senderId) && r.status === 'COMPLETED')
       .reverse() // Oldest first
       .slice(-6); // Keep last 6 exchanges for context
 
-    // 2. Build multi-turn conversational contents array for Gemini
+    // 3. Build multi-turn conversational contents array for Gemini
     const contents = [];
 
-    // Human Persona Prompt Rules
-    const systemPrompt = `You are a real person chatting casually with a customer on Instagram DMs.
-RULES:
-1. Talk naturally like a normal human friend having a chat on Instagram.
-2. Keep replies VERY SHORT and concise (1 short sentence max).
-3. Do NOT include usernames or greetings like "@username" or "Dear Customer".
-4. Do NOT give long detailed essays or corporate scripts.
-5. Answer questions directly, keep it friendly and casual.`;
+    // Human Persona & Training Rules
+    const systemPrompt = `You are replying on Instagram DMs on behalf of the account owner.
+
+CUSTOM PERSONA & TRAINING INSTRUCTIONS FROM ACCOUNT OWNER:
+${personaInstructions}
+
+STRICT BEHAVIOR RULES:
+1. ALWAYS BE POLITELY MANNERED: Be extremely polite, respectful, warm, and helpful at all times. NEVER be rude, blunt, sarcastic, or cold.
+2. NATURAL CHAT STYLE: Talk naturally like a friendly, normal person chatting on Instagram. Keep responses concise (1-2 sentences max).
+3. NO FORMAL LABELS OR TAGS: Do NOT use usernames like "@username", "Dear Customer", or corporate robot templates.
+4. ANSWER DIRECTLY: Answer questions politely, offer assistance warmly, and keep the dialogue pleasant.`;
 
     // Format historical conversation turns
     historyRecords.forEach(rec => {
@@ -85,7 +93,7 @@ RULES:
         contents: contents,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 120
+          maxOutputTokens: 150
         }
       })
     });
@@ -93,7 +101,7 @@ RULES:
     if (!response.ok) {
       const errText = await response.text();
       logger.error(`Gemini API error (HTTP ${response.status}): ${errText}`);
-      return `Hey! 👋 How can I help?`;
+      return `Hey! 👋 How can I help you today?`;
     }
 
     const data = await response.json();
@@ -101,14 +109,14 @@ RULES:
 
     if (!text) {
       logger.warn('Gemini returned empty text response, using simple fallback.');
-      return `Hey! How can I help?`;
+      return `Hey! How can I help you today?`;
     }
 
     return text;
 
   } catch (err) {
     logger.error(`Gemini AI generateConversationalAiReply error: ${err.message}`);
-    return `Hey! How can I help?`;
+    return `Hey! How can I help you today?`;
   }
 }
 

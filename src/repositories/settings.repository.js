@@ -14,7 +14,8 @@ class SettingsRepository {
       notificationMessage: "🚨 Hurry up! There is a customer.",
       automationEnabled: true,
       autoReplyOncePerConversation: true,
-      aiAutoApproveEnabled: true
+      aiAutoApproveEnabled: true,
+      aiPersonaInstruction: "You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person."
     };
   }
 
@@ -31,7 +32,8 @@ class SettingsRepository {
             notificationMessage: row.notification_message,
             automationEnabled: row.automation_enabled,
             autoReplyOncePerConversation: row.auto_reply_once_per_conversation,
-            aiAutoApproveEnabled: row.ai_auto_approve_enabled !== false
+            aiAutoApproveEnabled: row.ai_auto_approve_enabled !== false,
+            aiPersonaInstruction: row.ai_persona_instruction || this.settings.aiPersonaInstruction
           };
           return { ...this.settings };
         }
@@ -52,7 +54,10 @@ class SettingsRepository {
         : this.settings.replyDelaySeconds,
       aiAutoApproveEnabled: newSettings.aiAutoApproveEnabled !== undefined
         ? Boolean(newSettings.aiAutoApproveEnabled)
-        : this.settings.aiAutoApproveEnabled
+        : this.settings.aiAutoApproveEnabled,
+      aiPersonaInstruction: newSettings.aiPersonaInstruction !== undefined
+        ? String(newSettings.aiPersonaInstruction)
+        : this.settings.aiPersonaInstruction
     };
 
     if (db.isPostgresAvailable && db.pool) {
@@ -60,8 +65,9 @@ class SettingsRepository {
         await db.query(
           `INSERT INTO settings (
             id, reply1, reply2, reply_delay_seconds, notification_message,
-            automation_enabled, auto_reply_once_per_conversation, ai_auto_approve_enabled, updated_at
-          ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, NOW())
+            automation_enabled, auto_reply_once_per_conversation, ai_auto_approve_enabled,
+            ai_persona_instruction, updated_at
+          ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, NOW())
           ON CONFLICT (id) DO UPDATE SET
             reply1 = EXCLUDED.reply1,
             reply2 = EXCLUDED.reply2,
@@ -70,6 +76,7 @@ class SettingsRepository {
             automation_enabled = EXCLUDED.automation_enabled,
             auto_reply_once_per_conversation = EXCLUDED.auto_reply_once_per_conversation,
             ai_auto_approve_enabled = EXCLUDED.ai_auto_approve_enabled,
+            ai_persona_instruction = EXCLUDED.ai_persona_instruction,
             updated_at = NOW()`,
           [
             this.settings.reply1,
@@ -78,7 +85,8 @@ class SettingsRepository {
             this.settings.notificationMessage,
             this.settings.automationEnabled,
             this.settings.autoReplyOncePerConversation,
-            this.settings.aiAutoApproveEnabled
+            this.settings.aiAutoApproveEnabled,
+            this.settings.aiPersonaInstruction
           ]
         );
       } catch (err) {
