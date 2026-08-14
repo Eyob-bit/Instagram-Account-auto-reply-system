@@ -15,7 +15,7 @@ class SettingsRepository {
       automationEnabled: true,
       autoReplyOncePerConversation: true,
       aiAutoApproveEnabled: true,
-      aiPersonaInstruction: "You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person."
+      aiPersonaInstruction: "You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person. and my name is Eyob"
     };
   }
 
