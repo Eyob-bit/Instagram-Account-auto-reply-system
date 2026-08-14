@@ -36,6 +36,7 @@ const config = Object.freeze({
   vapidPublicKey: (process.env.VAPID_PUBLIC_KEY || '').trim(),
   vapidPrivateKey: (process.env.VAPID_PRIVATE_KEY || '').trim(),
   vapidSubject: (process.env.VAPID_SUBJECT || 'mailto:admin@example.com').trim(),
+  geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
   nodeEnv: process.env.NODE_ENV || 'development'
 });
 

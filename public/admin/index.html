@@ -76,10 +76,13 @@
     .btn-success { background: var(--success); color: #fff; }
     .btn-success:hover { background: #059669; }
     .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
     .btn-warning { background: var(--warning); color: #0f172a; }
     .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
     .btn-outline:hover { background: var(--surface-light); }
     .btn-block { width: 100%; }
+    .btn-ignore { background: rgba(239,68,68,0.15); border: 1px solid var(--danger); color: #fca5a5; }
+    .btn-ignore:hover { background: rgba(239,68,68,0.3); }
     .alert-error {
       background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger);
       color: #fca5a5; padding: 0.65rem; border-radius: 8px; font-size: 0.88rem; margin-bottom: 1rem; display: none;
@@ -442,16 +445,36 @@
 
     <!-- Tab 4: Settings -->
     <div id="tab-settings" class="tab-content">
+
+      <!-- AI Powered Banner -->
+      <div class="panel" style="border:2px solid var(--primary); background: linear-gradient(135deg, #0d1829 0%, #131d2e 100%); margin-bottom:1.5rem;">
+        <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+          <div style="font-size:2.5rem;">💬</div>
+          <div style="flex:1;">
+            <div style="font-size:1.15rem; font-weight:700; color:var(--primary); margin-bottom:0.3rem;">Gemini 2.0 Human-Like Conversational AI</div>
+            <div style="font-size:0.88rem; color:var(--text-muted); line-height:1.5;">
+              The AI handles <strong style="color:#a5f3fc;">full back-and-forth conversations with customers like a normal human person</strong> on Instagram DMs.
+              It remembers recent message history, answers questions contextually, and chats naturally in real time.
+            </div>
+          </div>
+          <div style="background:rgba(16,185,129,0.15); border:1px solid var(--success); border-radius:8px; padding:0.5rem 1rem; font-size:0.82rem; color:#6ee7b7; white-space:nowrap;">
+            🟢 Continuous AI Conversation
+          </div>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">Auto Reply & Timing Settings</span>
+          <span class="panel-title">⚙️ Auto Reply Settings</span>
         </div>
-        
+
         <form id="settings-form" onsubmit="saveSettings(event)">
+
+          <!-- AI Auto-Approve toggle -->
           <div class="form-group" style="background:#131d2e; padding:1rem; border-radius:8px; border:1px solid var(--primary); margin-bottom:1.5rem;">
             <label style="color:var(--primary); font-size:0.95rem;">🤖 AI Auto-Approve Mode</label>
             <div style="display:flex; align-items:center; justify-content:space-between; margin-top:0.5rem;">
-              <span style="font-size:0.85rem; color:var(--text-muted);">Automatically approve new customers 24/7 without waiting for browser dashboard.</span>
+              <span style="font-size:0.85rem; color:var(--text-muted);">Automatically approve new customers 24/7 without waiting for the dashboard.</span>
               <label class="switch">
                 <input type="checkbox" id="setting-ai-approve">
                 <span class="slider"></span>
@@ -459,37 +482,37 @@
             </div>
           </div>
 
+          <!-- Typing Delay -->
           <div class="form-group">
-            <label>Reply #1 Message</label>
-            <input type="text" id="setting-reply1" class="form-input" required oninput="updateLivePreview()" />
+            <label style="font-size:0.95rem;">⏱️ Human Typing Delay (Seconds)</label>
+            <div style="color:var(--text-muted); font-size:0.82rem; margin-bottom:0.5rem;">Simulates realistic human typing delay before Gemini AI sends its reply (0 – 60 seconds).</div>
+            <input type="number" id="setting-delay" class="form-input" min="0" max="60" required oninput="updateLivePreview()" placeholder="e.g. 3" style="max-width:180px;" />
           </div>
 
+          <!-- Push notification message -->
           <div class="form-group">
-            <label>Delay Between Replies (Seconds, 0-60)</label>
-            <input type="number" id="setting-delay" class="form-input" min="0" max="60" required oninput="updateLivePreview()" />
-          </div>
-
-          <div class="form-group">
-            <label>Reply #2 Message</label>
-            <input type="text" id="setting-reply2" class="form-input" required oninput="updateLivePreview()" />
-          </div>
-
-          <div class="form-group">
-            <label>Phone Push Notification Message</label>
+            <label style="font-size:0.95rem;">📱 Phone Push Notification Message</label>
             <input type="text" id="setting-notif" class="form-input" required oninput="updateLivePreview()" />
             <span style="font-size:0.75rem; color: var(--text-muted);">Tip: Add <code>@username</code> to automatically insert the customer's handle.</span>
           </div>
 
-          <button type="submit" class="btn btn-primary">Save Settings</button>
+          <button type="submit" class="btn btn-primary">💾 Save Settings</button>
         </form>
 
-        <!-- Live Preview -->
-        <div class="preview-box">
-          <div style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:0.75rem;">LIVE AUTOMATION PREVIEW</div>
-          <div class="chat-bubble chat-in">💬 Customer: "Hello, I need some information."</div>
-          <div class="chat-bubble chat-out" id="preview-reply1">Hey 👋</div>
-          <div class="chat-delay" id="preview-delay">⌛ (Waiting 3 seconds...)</div>
-          <div class="chat-bubble chat-out" id="preview-reply2">I want to work with you</div>
+        <!-- Live Conversation Preview -->
+        <div class="preview-box" style="margin-top:2rem;">
+          <div style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:0.75rem;">🔍 LIVE CONVERSATION PREVIEW</div>
+          <div class="chat-bubble chat-in">💬 Customer: "Hey, do you guys offer custom packages?"</div>
+          <div class="chat-delay" id="preview-delay">⌛ (Simulating human typing delay of 3 seconds...)</div>
+          <div class="chat-bubble chat-out" style="background: linear-gradient(135deg,#0ea5e9,#6366f1); display:flex; align-items:center; gap:0.4rem;">
+            <span style="font-size:0.72rem; opacity:0.75;">🤖 Gemini AI</span>
+            <span>"Hey! Yes, we definitely do. What kind of package are you looking for?"</span>
+          </div>
+          <div class="chat-bubble chat-in">💬 Customer: "I need automated auto-replies for my business."</div>
+          <div class="chat-bubble chat-out" style="background: linear-gradient(135deg,#7c3aed,#0ea5e9); display:flex; align-items:center; gap:0.4rem;">
+            <span style="font-size:0.72rem; opacity:0.75;">🤖 Gemini AI</span>
+            <span>"Awesome! We specialize in AI DM auto-replies. I can help set that up for you!"</span>
+          </div>
           <div class="chat-notif" id="preview-notif">📱 🚨 Hurry up! There is a customer! (@username contacted you)</div>
         </div>
       </div>
@@ -776,6 +799,7 @@
 
           <div class="actions">
             <button onclick="approveCustomerOneClick('${c.id}')" class="btn btn-success" style="flex:1;">✅ ADD CUSTOMER</button>
+            <button onclick="ignoreCustomer('${c.id}', '${c.username}')" class="btn btn-ignore" style="flex:1;">🚫 IGNORE</button>
             <button onclick="openCustomerDetailModal('${c.id}')" class="btn btn-outline" style="padding:0.5rem 0.8rem;">🔍 History</button>
           </div>
         </div>
@@ -982,9 +1006,7 @@
         const data = await res.json();
         if (data.success && data.data) {
           const s = data.data;
-          document.getElementById('setting-reply1').value = s.reply1;
           document.getElementById('setting-delay').value = s.replyDelaySeconds;
-          document.getElementById('setting-reply2').value = s.reply2;
           document.getElementById('setting-notif').value = s.notificationMessage;
           document.getElementById('setting-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
           document.getElementById('toggle-ai-approve').checked = Boolean(s.aiAutoApproveEnabled);
@@ -994,22 +1016,15 @@
     }
 
     function updateLivePreview() {
-      const r1 = document.getElementById('setting-reply1').value || 'Hey 👋';
       const delay = document.getElementById('setting-delay').value || 3;
-      const r2 = document.getElementById('setting-reply2').value || 'I want to work with you';
       const notif = document.getElementById('setting-notif').value || '🚨 Hurry up! There is a customer!';
-
-      document.getElementById('preview-reply1').textContent = r1;
-      document.getElementById('preview-delay').textContent = `⌛ (Waiting ${delay} seconds...)`;
-      document.getElementById('preview-reply2').textContent = r2;
+      document.getElementById('preview-delay').textContent = `⌛ (Simulating human typing delay of ${delay} seconds...)`;
       document.getElementById('preview-notif').textContent = `📱 ${notif} (@username contacted you)`;
     }
 
     async function saveSettings(e) {
       e.preventDefault();
-      const reply1 = document.getElementById('setting-reply1').value;
       const replyDelaySeconds = Number(document.getElementById('setting-delay').value);
-      const reply2 = document.getElementById('setting-reply2').value;
       const notificationMessage = document.getElementById('setting-notif').value;
       const aiAutoApproveEnabled = Boolean(document.getElementById('setting-ai-approve').checked);
 
@@ -1017,13 +1032,37 @@
         const res = await fetch(`${API_BASE}/settings`, {
           method: 'PUT',
           headers: authHeaders(),
-          body: JSON.stringify({ reply1, replyDelaySeconds, reply2, notificationMessage, aiAutoApproveEnabled })
+          body: JSON.stringify({ replyDelaySeconds, notificationMessage, aiAutoApproveEnabled })
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          showToast('Settings saved successfully!');
+          showToast('⚙️ Settings saved successfully!');
           loadDashboardData();
         } else { alert('Failed to save settings'); }
+      } catch (err) { alert('Network error'); }
+    }
+
+    // Ignore pending customer
+    async function ignoreCustomer(id, username) {
+      const displayName = username && username !== 'Username unavailable' ? '@' + username : 'this customer';
+      if (!confirm(`Ignore ${displayName}? They will be removed from the pending list and won't receive auto-replies.`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/approved-users/${id}/ignore`, {
+          method: 'POST',
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`🚫 ${displayName} has been ignored.`);
+          const card = document.getElementById(`pending-card-${id}`);
+          if (card) {
+            card.style.transition = 'opacity 0.3s, transform 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.95)';
+            setTimeout(() => card.remove(), 300);
+          }
+          loadDashboardData();
+        } else { alert(data.error || 'Failed to ignore customer'); }
       } catch (err) { alert('Network error'); }
     }
 

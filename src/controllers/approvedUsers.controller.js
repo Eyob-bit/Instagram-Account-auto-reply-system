@@ -128,11 +128,28 @@ async function getCustomerDetails(req, res, next) {
   }
 }
 
+/**
+ * Ignore a pending customer — sets status to DISABLED, removes from pending queue
+ */
+async function ignoreUser(req, res, next) {
+  try {
+    const { id } = req.params;
+    const user = await approvedUsersRepo.updateUser(id, { status: 'DISABLED', active: false });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Customer not found' });
+    }
+    res.status(200).json({ success: true, message: 'Customer has been ignored and removed from pending queue.', data: user });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getApprovedUsers,
   getPendingUsers,
   addApprovedUser,
   approveUser,
+  ignoreUser,
   updateApprovedUser,
   deleteApprovedUser,
   getCustomerDetails

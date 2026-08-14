@@ -3,7 +3,101 @@ const settingsRepo = require('../repositories/settings.repository');
 const conversationsRepo = require('../repositories/conversations.repository');
 const instagramService = require('./instagram.service');
 const notificationService = require('./notification.service');
+const config = require('../config/env');
 const logger = require('../utils/logger');
+
+// ───────── Gemini AI Configuration ─────────
+const GEMINI_API_KEY = config.geminiApiKey || process.env.GEMINI_API_KEY || '';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+/**
+ * Generate a conversational AI response using Gemini AI, maintaining full thread context.
+ * @param {string} senderId - Customer Instagram User ID
+ * @param {string} incomingText - Latest incoming DM text
+ * @param {string} username - Customer username
+ * @returns {Promise<string>} - Gemini AI generated response
+ */
+async function generateConversationalAiReply(senderId, incomingText, username) {
+  try {
+    // 1. Fetch recent conversation history to provide thread context to Gemini
+    const allRecords = await conversationsRepo.getRecords();
+    const historyRecords = allRecords
+      .filter(r => String(r.instagram_user_id) === String(senderId) && r.status === 'COMPLETED')
+      .reverse() // Oldest first
+      .slice(-6); // Keep last 6 exchanges for context
+
+    // 2. Build multi-turn conversational contents array for Gemini
+    const contents = [];
+
+    // System Persona Prompt
+    const systemPrompt = `You are a real, friendly, natural human assistant chatting directly with customers on Instagram DMs.
+Your goal is to talk like a normal person — warm, helpful, empathetic, casual yet professional.
+RULES:
+1. Talk like a real human being having a conversation on Instagram DMs.
+2. Keep replies natural, concise (1-3 short sentences max), and conversational.
+3. Do NOT sound like a rigid bot or customer service script.
+4. Answer questions directly, offer help, and keep the dialogue flowing naturally.
+5. Customer's handle is ${username || 'the user'}.`;
+
+    // Format historical conversation turns
+    historyRecords.forEach(rec => {
+      if (rec.incoming_message) {
+        contents.push({
+          role: 'user',
+          parts: [{ text: rec.incoming_message }]
+        });
+      }
+      if (rec.reply_1) {
+        contents.push({
+          role: 'model',
+          parts: [{ text: rec.reply_1 }]
+        });
+      }
+    });
+
+    // Add current incoming message turn
+    contents.push({
+      role: 'user',
+      parts: [{ text: incomingText || 'Hello' }]
+    });
+
+    // Call Gemini 2.0 Flash API
+    const response = await fetch(GEMINI_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: contents,
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 180
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      logger.error(`Gemini API error (HTTP ${response.status}): ${errText}`);
+      return `Hey ${username ? username : ''}! 👋 Thanks for reaching out! How can I help you?`;
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!text) {
+      logger.warn('Gemini returned empty text response, using conversational fallback.');
+      return `Hey! Thanks for messaging. What can I do for you today?`;
+    }
+
+    return text;
+
+  } catch (err) {
+    logger.error(`Gemini AI generateConversationalAiReply error: ${err.message}`);
+    return `Hey! Thanks for your message! How can I help you today?`;
+  }
+}
 
 class AutoReplyService {
   /**
@@ -19,7 +113,7 @@ class AutoReplyService {
     if (isApproved) {
       logger.info(
         `\n============================================================\n` +
-        `✅ APPROVED INSTAGRAM CUSTOMER\n` +
+        `✅ APPROVED INSTAGRAM CUSTOMER (AI CONVERSATION)\n` +
         `============================================================\n` +
         `👤 Username: ${usernameDisplay}\n` +
         `🆔 Instagram User ID: ${senderId}\n` +
@@ -74,7 +168,7 @@ class AutoReplyService {
 
     // 🤖 AI AUTO-APPROVE CHECK:
     // If customer is PENDING and AI Auto-Approve mode is enabled in settings,
-    // automatically approve the customer immediately without waiting for browser dashboard!
+    // automatically approve customer immediately 24/7 without waiting for browser dashboard!
     if (!isApproved && customer.status === 'PENDING' && settings.aiAutoApproveEnabled) {
       logger.info(`🤖 [AI AUTO-APPROVE ACTIVE] New customer [${senderId}] detected! Auto-approving immediately 24/7...`);
       const approveResult = await approvedUsersRepo.approveUser(senderId);
@@ -120,123 +214,103 @@ class AutoReplyService {
       return;
     }
 
-    // 4. Check conversation state
+    logger.info(`Approved user [${senderId}] (${username}) sent DM: "${text}". Triggering Gemini Conversational AI...`);
+
+    // Update conversation state for tracking
     const convState = await conversationsRepo.getConversationState(senderId);
-    if (settings.autoReplyOncePerConversation && convState.hasReplied) {
-      logger.info(`Auto-reply already executed for approved user [${senderId}] in this conversation state. Skipping.`);
-      return;
-    }
-
-    logger.info(`Approved user [${senderId}] (${username}) sent message: "${text}". Starting automated reply workflow.`);
-
-    // Update state to prevent parallel duplicate execution
     await conversationsRepo.updateConversationState(senderId, {
       hasReplied: true,
       lastMessageAt: new Date().toISOString(),
       messageCount: convState.messageCount + 1
     });
 
-    // Execute sequence asynchronously
-    this.executeAutomationSequence(senderId, text, messageId, settings, customer).catch(err => {
-      logger.error(`Error during automated reply workflow for [${senderId}]:`, err.message);
+    // Execute natural AI conversation response
+    this.executeConversationalAiResponse(senderId, text, messageId, settings, customer).catch(err => {
+      logger.error(`Error during conversational AI reply workflow for [${senderId}]:`, err.message);
     });
   }
 
   /**
-   * Execute the 2-message reply + delay + push notification workflow
+   * Execute human-like Gemini AI conversation response workflow
    * @param {string} senderId 
    * @param {string} incomingText 
    * @param {string} messageId 
    * @param {object} settings 
    * @param {object} customer 
    */
-  async executeAutomationSequence(senderId, incomingText, messageId, settings, customer) {
+  async executeConversationalAiResponse(senderId, incomingText, messageId, settings, customer) {
     const username = (customer?.username && customer.username !== 'Username unavailable')
       ? `@${customer.username}`
       : `User ${senderId}`;
-    let reply1Sent = false;
-    let reply2Sent = false;
+
+    let replySent = false;
     let notificationSent = false;
     let errorMessage = null;
+    let aiResponse = '';
 
     try {
-      // Step 1: Send Automatic Reply #1
-      logger.info(`[Step 1/3] Sending Reply #1 to customer [${senderId}]: "${settings.reply1}"`);
-      const res1 = await instagramService.sendMessage(senderId, settings.reply1);
-      if (res1.success) {
-        reply1Sent = true;
-      } else {
-        errorMessage = `Reply #1 failed: ${JSON.stringify(res1.error || res1.reason)}`;
-        logger.error(`[Step 1/3 FAILED] Reply #1 to customer [${senderId}] failed. Stopping sequence.`);
+      // Step 1: Wait configured typing delay to sound like a normal human typing
+      const rawDelay = Number(settings.replyDelaySeconds);
+      const delaySeconds = isNaN(rawDelay) ? 3 : Math.max(0, Math.min(60, rawDelay));
+      const delayMs = delaySeconds * 1000;
+
+      if (delayMs > 0) {
+        logger.info(`[Human Typing Delay] Waiting ${delaySeconds}s before responding...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
 
-      // Proceed to Step 2 & 3 ONLY if Reply #1 succeeded
-      if (reply1Sent) {
-        // Step 2: Wait for configured delay (validated 0-60 seconds)
-        const rawDelay = Number(settings.replyDelaySeconds);
-        const delaySeconds = isNaN(rawDelay) ? 3 : Math.max(0, Math.min(60, rawDelay));
-        const delayMs = delaySeconds * 1000;
+      // Step 2: Generate natural human-like Gemini AI response with full conversation context
+      logger.info(`[Gemini AI] Generating contextual response for customer [${senderId}]...`);
+      aiResponse = await generateConversationalAiReply(senderId, incomingText, username);
 
-        logger.info(`[Step 2/3] Waiting configured delay of ${delaySeconds}s (${delayMs}ms)...`);
-        if (delayMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
+      // Step 3: Send AI reply to Instagram DM
+      logger.info(`[Instagram DM] Sending AI response to customer [${senderId}]: "${aiResponse}"`);
+      const res = await instagramService.sendMessage(senderId, aiResponse);
 
-        // Send Automatic Reply #2
-        logger.info(`[Step 2/3] Sending Reply #2 to customer [${senderId}]: "${settings.reply2}"`);
-        const res2 = await instagramService.sendMessage(senderId, settings.reply2);
-        if (res2.success) {
-          reply2Sent = true;
-        } else {
-          const errStr = `Reply #2 failed: ${JSON.stringify(res2.error || res2.reason)}`;
-          errorMessage = errorMessage ? `${errorMessage}; ${errStr}` : errStr;
-          logger.error(`[Step 2/3 FAILED] Reply #2 to customer [${senderId}] failed.`);
-        }
+      if (res.success) {
+        replySent = true;
+      } else {
+        errorMessage = `Failed to send Instagram DM: ${JSON.stringify(res.error || res.reason)}`;
+        logger.error(`[Instagram DM Error] ${errorMessage}`);
+      }
 
-        // Step 3: Trigger Phone Push Notification
-        const notifText = settings.notificationMessage.includes('@username') 
-          ? settings.notificationMessage.replace('@username', username)
-          : `${settings.notificationMessage} (${username} contacted you)`;
+      // Step 4: Trigger Phone Push Notification for admin
+      const notifText = settings.notificationMessage.includes('@username') 
+        ? settings.notificationMessage.replace('@username', username)
+        : `${settings.notificationMessage} (${username} sent: "${incomingText}")`;
 
-        logger.info(`[Step 3/3] Triggering phone push notification: "${notifText}"`);
-        const notifRes = await notificationService.sendPhoneNotification(
-          'New Customer Alert!',
-          notifText,
-          { senderId, username }
-        );
+      logger.info(`[Push Alert] Sending phone notification: "${notifText}"`);
+      const notifRes = await notificationService.sendPhoneNotification(
+        `💬 DM from ${username}`,
+        notifText,
+        { senderId, username, message: incomingText }
+      );
 
-        if (notifRes.success) {
-          notificationSent = true;
-        }
+      if (notifRes.success) {
+        notificationSent = true;
       }
 
     } catch (err) {
-      logger.error(`Exception in executeAutomationSequence for customer [${senderId}]:`, err.message);
+      logger.error(`Exception in executeConversationalAiResponse for customer [${senderId}]:`, err.message);
       errorMessage = err.message;
     }
 
-    // Determine final status accurately
-    let status = 'COMPLETED';
-    if (!reply1Sent && !reply2Sent) {
-      status = 'FAILED';
-    } else if (!reply1Sent || !reply2Sent) {
-      status = 'PARTIAL_SUCCESS';
-    }
+    const status = replySent ? 'COMPLETED' : 'FAILED';
 
     // Update customer automation status in repository
     await approvedUsersRepo.setAutomationStatus(senderId, status);
 
-    // Record complete conversation audit log accurately
+    // Record complete conversation audit log
     await conversationsRepo.createRecord({
       message_id: messageId,
       instagram_user_id: senderId,
       username: customer?.username || `user_${senderId}`,
       incoming_message: incomingText,
-      reply_1: settings.reply1,
-      reply_2: settings.reply2,
+      reply_1: aiResponse,
+      reply_2: '',
       notification_message: settings.notificationMessage,
-      reply_1_sent: reply1Sent,
-      reply_2_sent: reply2Sent,
+      reply_1_sent: replySent,
+      reply_2_sent: false,
       notification_sent: notificationSent,
       is_approved: true,
       status: status,
@@ -244,7 +318,7 @@ class AutoReplyService {
       completed_at: new Date().toISOString()
     });
 
-    if (reply1Sent || reply2Sent) {
+    if (replySent) {
       await conversationsRepo.updateConversationState(senderId, {
         lastRepliedAt: new Date().toISOString()
       });
@@ -261,7 +335,7 @@ class AutoReplyService {
     const text = customer.latest_message || 'Hey';
     const messageId = customer.pending_message_id || `mid.approved_pending_${Date.now()}`;
 
-    logger.info(`⚡ [ONE-CLICK APPROVAL AUTO-TRIGGER] Admin approved customer [${senderId}]. Immediately processing original message: "${text}"`);
+    logger.info(`⚡ [ONE-CLICK APPROVAL AUTO-TRIGGER] Admin approved customer [${senderId}]. Immediately starting AI conversation for message: "${text}"`);
 
     const settings = await settingsRepo.getSettings();
     if (!settings.automationEnabled) {
@@ -269,9 +343,9 @@ class AutoReplyService {
       return;
     }
 
-    // Execute sequence immediately!
-    this.executeAutomationSequence(senderId, text, messageId, settings, customer).catch(err => {
-      logger.error(`Error during immediate approval reply workflow for [${senderId}]:`, err.message);
+    // Execute conversational response immediately!
+    this.executeConversationalAiResponse(senderId, text, messageId, settings, customer).catch(err => {
+      logger.error(`Error during immediate approval conversational workflow for [${senderId}]:`, err.message);
     });
   }
 }
