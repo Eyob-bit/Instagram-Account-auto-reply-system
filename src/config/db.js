@@ -82,6 +82,7 @@ async function initSchema() {
     );
 
     ALTER TABLE settings ADD COLUMN IF NOT EXISTS ai_auto_approve_enabled BOOLEAN DEFAULT true;
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS ai_persona_instruction TEXT;
 
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id SERIAL PRIMARY KEY,

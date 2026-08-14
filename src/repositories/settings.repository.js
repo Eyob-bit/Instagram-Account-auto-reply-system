@@ -15,7 +15,7 @@ class SettingsRepository {
       automationEnabled: true,
       autoReplyOncePerConversation: true,
       aiAutoApproveEnabled: true,
-      aiPersonaInstruction: "You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person. and my name is Eyob"
+      aiPersonaInstruction: "You are a very polite, warm, respectful, and friendly assistant replying on Instagram DMs. Always be super polite, helpful, and welcoming. Talk naturally like a normal human person."
     };
   }
 
@@ -26,13 +26,15 @@ class SettingsRepository {
         if (res.rows.length > 0) {
           const row = res.rows[0];
           this.settings = {
-            reply1: row.reply1,
-            reply2: row.reply2,
-            replyDelaySeconds: row.reply_delay_seconds,
-            notificationMessage: row.notification_message,
-            automationEnabled: row.automation_enabled,
-            autoReplyOncePerConversation: row.auto_reply_once_per_conversation,
-            aiAutoApproveEnabled: row.ai_auto_approve_enabled !== false,
+            reply1: row.reply1 || this.settings.reply1,
+            reply2: row.reply2 || this.settings.reply2,
+            replyDelaySeconds: (row.reply_delay_seconds !== undefined && row.reply_delay_seconds !== null)
+              ? Number(row.reply_delay_seconds)
+              : this.settings.replyDelaySeconds,
+            notificationMessage: row.notification_message || this.settings.notificationMessage,
+            automationEnabled: row.automation_enabled !== false && row.automation_enabled !== null,
+            autoReplyOncePerConversation: row.auto_reply_once_per_conversation !== false,
+            aiAutoApproveEnabled: row.ai_auto_approve_enabled !== false && row.ai_auto_approve_enabled !== null,
             aiPersonaInstruction: row.ai_persona_instruction || this.settings.aiPersonaInstruction
           };
           return { ...this.settings };
@@ -46,15 +48,29 @@ class SettingsRepository {
   }
 
   async updateSettings(newSettings) {
+    if (!newSettings || typeof newSettings !== 'object') {
+      return { ...this.settings };
+    }
+
+    // Explicitly update only specified fields, preserving existing state for undefined fields
     this.settings = {
-      ...this.settings,
-      ...newSettings,
+      reply1: newSettings.reply1 !== undefined ? String(newSettings.reply1) : this.settings.reply1,
+      reply2: newSettings.reply2 !== undefined ? String(newSettings.reply2) : this.settings.reply2,
       replyDelaySeconds: newSettings.replyDelaySeconds !== undefined
         ? Number(newSettings.replyDelaySeconds)
         : this.settings.replyDelaySeconds,
+      notificationMessage: newSettings.notificationMessage !== undefined
+        ? String(newSettings.notificationMessage)
+        : this.settings.notificationMessage,
+      automationEnabled: newSettings.automationEnabled !== undefined
+        ? Boolean(newSettings.automationEnabled)
+        : (this.settings.automationEnabled !== false),
+      autoReplyOncePerConversation: newSettings.autoReplyOncePerConversation !== undefined
+        ? Boolean(newSettings.autoReplyOncePerConversation)
+        : Boolean(this.settings.autoReplyOncePerConversation),
       aiAutoApproveEnabled: newSettings.aiAutoApproveEnabled !== undefined
         ? Boolean(newSettings.aiAutoApproveEnabled)
-        : this.settings.aiAutoApproveEnabled,
+        : (this.settings.aiAutoApproveEnabled !== false),
       aiPersonaInstruction: newSettings.aiPersonaInstruction !== undefined
         ? String(newSettings.aiPersonaInstruction)
         : this.settings.aiPersonaInstruction
