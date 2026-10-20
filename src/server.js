@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -23,21 +24,54 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
+// Helper to reliably resolve static files across local and Vercel serverless filesystem
+function getPublicFilePath(relativePath) {
+  const candidate1 = path.resolve(process.cwd(), 'public', relativePath);
+  if (fs.existsSync(candidate1)) return candidate1;
+  const candidate2 = path.join(__dirname, '..', 'public', relativePath);
+  if (fs.existsSync(candidate2)) return candidate2;
+  return null;
+}
+
 // Admin Dashboard UI Route (Explicit redirect/serve before static middleware)
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
-});
-app.get('/admin/*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
+app.get(['/admin', '/admin/*'], (req, res) => {
+  const adminFile = getPublicFilePath('admin/index.html');
+  if (adminFile) {
+    return res.sendFile(adminFile);
+  }
+  return res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>Admin Dashboard</title></head>
+      <body style="font-family:sans-serif;background:#0f172a;color:#fff;padding:2rem;text-align:center;">
+        <h2>Admin Dashboard</h2>
+        <p>Dashboard is initializing. Please refresh or navigate to <a href="/admin/index.html" style="color:#38bdf8">Admin</a>.</p>
+      </body>
+    </html>
+  `);
 });
 
 // Privacy Policy Page Endpoint
 app.get('/privacy', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'privacy.html'));
+  const privacyFile = getPublicFilePath('privacy.html');
+  if (privacyFile) {
+    return res.sendFile(privacyFile);
+  }
+  return res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>Privacy Policy</title></head>
+      <body style="font-family:sans-serif;background:#0f172a;color:#fff;padding:2rem;">
+        <h2>Privacy Policy</h2>
+        <p>This application processes Instagram Direct Messages strictly for customer service auto-reply automation.</p>
+      </body>
+    </html>
+  `);
 });
 
 // Serve static files from public/ (PWA manifest, service worker, icons, etc.)
-app.use(express.static(path.join(__dirname, '..', 'public')));
+const publicDir = getPublicFilePath('') || path.join(__dirname, '..', 'public');
+app.use(express.static(publicDir));
 
 // Mount Meta Webhook Routes
 app.use('/webhooks', webhookRoutes);
@@ -89,28 +123,34 @@ app.use((req, res) => {
 // Centralized Error Handling Middleware
 app.use(errorHandler);
 
-// Start HTTP Server & Initialize DB Schema
-const server = app.listen(config.port, async () => {
-  logger.info(`🚀 Instagram Auto-Reply System server running on port ${config.port} (${config.nodeEnv})`);
-  logger.info(`GET  /api/health            - Health Status Check`);
-  logger.info(`GET  /admin                 - Admin Dashboard`);
-  logger.info(`GET  /privacy               - Privacy Policy Page`);
-  logger.info(`GET  /webhooks/instagram    - Meta Webhook Verification`);
-  logger.info(`POST /webhooks/instagram    - Meta Webhook Event Receiver`);
-
-  // Initialize DB tables if PostgreSQL is configured
-  if (db.isPostgresAvailable) {
-    await db.initSchema();
-  }
-});
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    logger.info('Server closed.');
-    process.exit(0);
+// Initialize DB schema automatically if PostgreSQL is configured
+if (db.isPostgresAvailable) {
+  db.initSchema().catch(err => {
+    logger.error('PostgreSQL schema auto-migration error:', err.message);
   });
-});
+}
 
-module.exports = server;
+// Start HTTP Server ONLY when executed directly as main script (e.g. node src/server.js or npm start)
+if (require.main === module) {
+  const port = config.port || 3000;
+  const server = app.listen(port, () => {
+    logger.info(`🚀 Instagram Auto-Reply System server running on port ${port} (${config.nodeEnv})`);
+    logger.info(`GET  /api/health            - Health Status Check`);
+    logger.info(`GET  /admin                 - Admin Dashboard`);
+    logger.info(`GET  /privacy               - Privacy Policy Page`);
+    logger.info(`GET  /webhooks/instagram    - Meta Webhook Verification`);
+    logger.info(`POST /webhooks/instagram    - Meta Webhook Event Receiver`);
+  });
+
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+      logger.info('Server closed.');
+      process.exit(0);
+    });
+  });
+}
+
+// Export Express app for Vercel Serverless Function runtime
+module.exports = app;

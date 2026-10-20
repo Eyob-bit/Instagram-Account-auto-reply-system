@@ -9,13 +9,12 @@ const requiredEnvVars = ['META_VERIFY_TOKEN'];
 function validateEnv() {
   const missing = requiredEnvVars.filter(varName => !process.env[varName]);
   if (missing.length > 0) {
-    logger.error(`Missing required environment variables: ${missing.join(', ')}`);
-    logger.error('Please check your .env file or refer to .env.example.');
-    process.exit(1);
+    logger.warn(`⚠️ Warning: Missing environment variables: ${missing.join(', ')}`);
+    logger.warn('Please check your .env file or configure them in Vercel Project Settings > Environment Variables.');
   }
 
   if (!process.env.META_INSTAGRAM_ACCESS_TOKEN) {
-    logger.warn('META_INSTAGRAM_ACCESS_TOKEN is not set or empty in .env. API calls to Instagram will fail until provided.');
+    logger.warn('META_INSTAGRAM_ACCESS_TOKEN is not set or empty. API calls to Instagram will fail until provided.');
   }
 }
 
